@@ -1,0 +1,11 @@
+source_dataset:
+  raw_image_root: "${RAW_IMAGE_ROOT}/images"
+  raw_json_root: "${RAW_JSON_ROOT}/annotations"
+  
+reference_artifacts:
+  yolo_reference_zip: "${REFERENCE_DIR}/weldvision-yolo-reference-2026-08-03.zip"
+  yolo_reference_unzipped: "${REFERENCE_DIR}/unzipped"
+
+export_settings:
+  output_root: "${OUTPUT_ROOT}/canonical_export"
+  format: "cvat_polygon"

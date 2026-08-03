@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "dataset_name": "RIAWELC_ANONYMOUS_SAMPLE",
+  "modality": "RT",
+  "image_info": {
+    "image_id": "SAMPLE_0001",
+    "filename": "sample_weld_001.png",
+    "width": 800,
+    "height": 600
+  },
+  "annotations": [
+    {
+      "annotation_id": "ANN_001",
+      "label": "기공",
+      "defect_type": "porosity",
+      "polygon": {
+        "x": [120.0, 155.0, 160.0, 125.0],
+        "y": [200.0, 205.0, 240.0, 235.0]
+      }
+    }
+  ]
+}
