@@ -32,6 +32,38 @@ def test_parse_valid_fixture(taxonomy: TaxonomyConfig, sample_json_path: Path):
     assert det.modality == "RT"
     assert len(det.polygon.x) == 4
     assert len(det.polygon.y) == 4
+    assert det.extra_meta == {
+        "image_id": "SAMPLE_0001",
+        "filename": "sample_weld_001.png",
+        "width": 800,
+        "height": 600,
+    }
+
+
+def test_parse_empty_annotations_returns_empty_list(taxonomy: TaxonomyConfig):
+    assert parse_riawelc_json({"annotations": []}, taxonomy) == []
+
+
+def test_parse_non_object_annotation_raises_error(taxonomy: TaxonomyConfig):
+    with pytest.raises(ParsingError, match="Annotation item at index 0 must be a dictionary object"):
+        parse_riawelc_json({"annotations": ["invalid"]}, taxonomy)
+
+
+def test_parse_disallowed_modality_raises_error(taxonomy: TaxonomyConfig):
+    invalid_data = {
+        "modality": "INVALID",
+        "annotations": [
+            {
+                "label": "porosity",
+                "polygon": {
+                    "x": [10.0, 20.0, 30.0],
+                    "y": [10.0, 20.0, 30.0],
+                },
+            }
+        ],
+    }
+    with pytest.raises(ParsingError, match="Modality 'INVALID' is not allowed"):
+        parse_riawelc_json(invalid_data, taxonomy)
 
 
 def test_parse_coordinate_mismatch_raises_error(taxonomy: TaxonomyConfig):
