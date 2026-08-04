@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
+from numbers import Real
 from typing import Any
 
 
@@ -23,6 +25,20 @@ class Polygon:
             raise ParsingError(
                 f"Polygon requires at least 3 vertices, got {len(self.x)}"
             )
+
+        for field_name, coordinates in (("x", self.x), ("y", self.y)):
+            normalized = []
+            for index, value in enumerate(coordinates):
+                if isinstance(value, bool) or not isinstance(value, Real):
+                    raise ParsingError(
+                        f"Polygon {field_name} coordinate at index {index} must be a number."
+                    )
+                if not math.isfinite(value):
+                    raise ParsingError(
+                        f"Polygon {field_name} coordinate at index {index} must be finite."
+                    )
+                normalized.append(float(value))
+            object.__setattr__(self, field_name, tuple(normalized))
 
 
 @dataclass
