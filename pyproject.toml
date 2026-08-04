@@ -20,4 +20,4 @@ dev = [
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]
-pythonpath = ["src/welding_qa"]
+pythonpath = ["src"]
