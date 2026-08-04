@@ -33,11 +33,17 @@ class Polygon:
                     raise ParsingError(
                         f"Polygon {field_name} coordinate at index {index} must be a number."
                     )
-                if not math.isfinite(value):
+                try:
+                    normalized_value = float(value)
+                except OverflowError as exc:
+                    raise ParsingError(
+                        f"Polygon {field_name} coordinate at index {index} must be finite."
+                    ) from exc
+                if not math.isfinite(normalized_value):
                     raise ParsingError(
                         f"Polygon {field_name} coordinate at index {index} must be finite."
                     )
-                normalized.append(float(value))
+                normalized.append(normalized_value)
             object.__setattr__(self, field_name, tuple(normalized))
 
 

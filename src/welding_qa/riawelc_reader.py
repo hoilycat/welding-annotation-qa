@@ -47,9 +47,11 @@ def parse_riawelc_json(
     if not isinstance(annotations_list, list):
         raise ParsingError(f"Field '{annotations_field}' must be a list.")
 
-    modality = data.get("modality") or default_modality
+    modality = data["modality"] if "modality" in data else default_modality
     if not isinstance(modality, str):
         raise ParsingError("Field 'modality' must be a string.")
+    if not modality:
+        raise ParsingError("Field 'modality' must not be empty.")
     image_info = data.get("image_info")
     if not isinstance(image_info, dict):
         image_info = {}

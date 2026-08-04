@@ -39,6 +39,29 @@ def test_parse_empty_annotations_returns_empty_list(taxonomy: TaxonomyConfig):
     assert parse_riawelc_json({"annotations": []}, taxonomy) == []
 
 
+def test_parse_invalid_json_string_raises_parsing_error(taxonomy: TaxonomyConfig):
+    with pytest.raises(ParsingError, match="Invalid JSON content"):
+        parse_riawelc_json('{"annotations": [}', taxonomy)
+
+
+def test_parse_unknown_label_raises_parsing_error(taxonomy: TaxonomyConfig):
+    with pytest.raises(
+        ParsingError,
+        match="Annotation item at index 0 has invalid label: Unknown label 'not-a-defect'",
+    ):
+        parse_riawelc_json(
+            {
+                "annotations": [
+                    {
+                        "label": "not-a-defect",
+                        "polygon": {"x": [1, 2, 3], "y": [1, 2, 3]},
+                    }
+                ]
+            },
+            taxonomy,
+        )
+
+
 @pytest.mark.parametrize("annotations", [{}, "invalid", None])
 def test_parse_non_list_annotations_raises_error(
     taxonomy: TaxonomyConfig, annotations: object
@@ -69,9 +92,12 @@ def test_parse_disallowed_modality_raises_error(taxonomy: TaxonomyConfig):
         parse_riawelc_json(invalid_data, taxonomy)
 
 
-def test_parse_non_string_modality_raises_parsing_error(taxonomy: TaxonomyConfig):
+@pytest.mark.parametrize("modality", [0, False, None])
+def test_parse_non_string_modality_raises_parsing_error(
+    taxonomy: TaxonomyConfig, modality: object
+):
     invalid_data = {
-        "modality": 1,
+        "modality": modality,
         "annotations": [
             {
                 "label": "porosity",
@@ -81,6 +107,11 @@ def test_parse_non_string_modality_raises_parsing_error(taxonomy: TaxonomyConfig
     }
     with pytest.raises(ParsingError, match="Field 'modality' must be a string"):
         parse_riawelc_json(invalid_data, taxonomy)
+
+
+def test_parse_empty_modality_is_not_replaced_by_default(taxonomy: TaxonomyConfig):
+    with pytest.raises(ParsingError, match="Field 'modality' must not be empty"):
+        parse_riawelc_json({"modality": "", "annotations": []}, taxonomy)
 
 
 def test_parse_coordinate_mismatch_raises_error(taxonomy: TaxonomyConfig):
@@ -168,6 +199,24 @@ def test_parse_non_finite_coordinate_raises_error(
                         "label": "porosity",
                         "polygon": {
                             "x": [bad_coordinate, 2, 3],
+                            "y": [1, 2, 3],
+                        },
+                    }
+                ]
+            },
+            taxonomy,
+        )
+
+
+def test_parse_oversized_coordinate_raises_parsing_error(taxonomy: TaxonomyConfig):
+    with pytest.raises(ParsingError, match="x coordinate at index 0 must be finite"):
+        parse_riawelc_json(
+            {
+                "annotations": [
+                    {
+                        "label": "porosity",
+                        "polygon": {
+                            "x": [10**1000, 2, 3],
                             "y": [1, 2, 3],
                         },
                     }
