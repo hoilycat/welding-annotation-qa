@@ -108,6 +108,34 @@ print(annotations[0].label_canonical)  # porosity
 
 이 경우 오류가 아니라 빈 annotation 목록을 반환합니다. 🌿
 
+### CVAT Polygon payload 만들기
+
+CVAT 프로젝트에서 조회한 label ID를 canonical label에 연결하면 검증된
+annotation을 `LabeledShapeRequest` 형태로 변환할 수 있습니다.
+
+```python
+from welding_qa import annotations_to_cvat_shapes
+
+label_ids = {"porosity": 7}  # CVAT 프로젝트의 실제 label ID
+shapes = annotations_to_cvat_shapes(
+    annotations,
+    label_ids,
+    frame=0,
+)
+
+cvat_payload = {
+    "version": 0,
+    "tags": [],
+    "shapes": shapes,
+    "tracks": [],
+    "intervals": [],
+}
+```
+
+각 Polygon 좌표는 CVAT 형식인 `[x1, y1, x2, y2, ...]`로 변환됩니다.
+`cvat_shapes_to_annotations`를 사용하면 CVAT shape를 다시
+`DefectAnnotation`으로 가져올 수 있습니다.
+
 ---
 
 ## 🔄 데이터는 이렇게 흘러가요
@@ -122,6 +150,8 @@ print(annotations[0].label_canonical)  # porosity
           └─ RT/VT modality 확인
                     ↓
        ✨ 검증된 DefectAnnotation 목록
+                    ↓
+       🧩 CVAT Polygon shape 변환
                     ↓
           🔥 모델 학습과 결함 검출
 ```
@@ -152,9 +182,11 @@ welding-annotation-qa/
 ├── src/welding_qa/
 │   ├── models.py              # Polygon과 annotation 모델
 │   ├── taxonomy.py            # 라벨 정규화
-│   └── riawelc_reader.py      # JSON 파싱과 검증
+│   ├── riawelc_reader.py      # JSON 파싱과 검증
+│   └── cvat_converter.py      # CVAT Polygon 양방향 변환
 ├── tests/
 │   ├── fixtures/              # 익명 샘플 JSON
+│   ├── test_cvat_converter.py
 │   ├── test_taxonomy.py
 │   └── test_riawelc_reader.py
 └── docs/

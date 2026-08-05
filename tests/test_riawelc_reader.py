@@ -114,6 +114,11 @@ def test_parse_empty_modality_is_not_replaced_by_default(taxonomy: TaxonomyConfi
         parse_riawelc_json({"modality": "", "annotations": []}, taxonomy)
 
 
+def test_parse_whitespace_modality_is_not_accepted(taxonomy: TaxonomyConfig):
+    with pytest.raises(ParsingError, match="Field 'modality' must not be empty"):
+        parse_riawelc_json({"modality": "   ", "annotations": []}, taxonomy)
+
+
 def test_parse_coordinate_mismatch_raises_error(taxonomy: TaxonomyConfig):
     invalid_data = {
         "modality": "RT",
