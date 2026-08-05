@@ -136,6 +136,39 @@ cvat_payload = {
 `cvat_shapes_to_annotations`를 사용하면 CVAT shape를 다시
 `DefectAnnotation`으로 가져올 수 있습니다.
 
+### 로컬 CVAT 환경 실행하기
+
+Docker Desktop을 실행한 뒤 아래 명령으로 프로젝트에 고정된 CVAT 버전을
+준비하고 시작할 수 있습니다.
+
+```bash
+cp .env.cvat.example .env.cvat
+./scripts/cvat-local.sh bootstrap
+./scripts/cvat-local.sh up
+```
+
+CVAT는 기본적으로 <http://localhost:8080>에서 열립니다. 최초 관리자 계정은
+서버가 준비된 다음 대화형 명령으로 생성합니다.
+
+```bash
+./scripts/cvat-local.sh health
+./scripts/cvat-local.sh superuser
+```
+
+Python SDK가 필요한 개발 환경은 서버와 같은 2.70 버전으로 설치됩니다.
+
+```bash
+pip install -e ".[dev,cvat]"
+```
+
+상태 확인과 종료에는 다음 명령을 사용합니다. `down`은 Docker 데이터 볼륨을
+삭제하지 않으므로 생성한 사용자와 annotation이 유지됩니다.
+
+```bash
+./scripts/cvat-local.sh status
+./scripts/cvat-local.sh down
+```
+
 ---
 
 ## 🔄 데이터는 이렇게 흘러가요

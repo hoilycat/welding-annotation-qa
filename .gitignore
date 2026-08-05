@@ -27,10 +27,12 @@ htmlcov/
 
 # Environments
 .env
+.env.cvat
 .venv
 env/
 venv/
 ENV/
+.local/
 
 # Data & Large Archives
 *.zip

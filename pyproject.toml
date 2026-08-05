@@ -13,6 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+cvat = [
+    "cvat-sdk==2.70.0",
+]
 dev = [
     "pytest>=7.0.0",
 ]
