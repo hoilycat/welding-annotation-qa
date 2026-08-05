@@ -55,6 +55,8 @@ def parse_riawelc_json(
     image_info = data.get("image_info")
     if not isinstance(image_info, dict):
         image_info = {}
+    image_width = image_info.get("width", data.get("width"))
+    image_height = image_info.get("height", data.get("height"))
 
     parsed_defects: list[DefectAnnotation] = []
 
@@ -118,6 +120,7 @@ def parse_riawelc_json(
 
         try:
             polygon = Polygon(x=tuple(xs), y=tuple(ys))
+            polygon.validate_image_bounds(width=image_width, height=image_height)
         except ParsingError as exc:
             raise ParsingError(f"Annotation item at index {idx}: {exc}") from exc
 
@@ -130,8 +133,8 @@ def parse_riawelc_json(
                 extra_meta={
                     "image_id": image_info.get("image_id", data.get("image_id")),
                     "filename": image_info.get("filename", data.get("filename")),
-                    "width": image_info.get("width", data.get("width")),
-                    "height": image_info.get("height", data.get("height")),
+                    "width": image_width,
+                    "height": image_height,
                 },
             )
         )

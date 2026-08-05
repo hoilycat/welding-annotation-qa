@@ -46,6 +46,57 @@ class Polygon:
                 normalized.append(normalized_value)
             object.__setattr__(self, field_name, tuple(normalized))
 
+        points = tuple(zip(self.x, self.y))
+        for index in range(1, len(points)):
+            if points[index] == points[index - 1]:
+                raise ParsingError(
+                    f"Polygon has consecutive duplicate vertices at indices "
+                    f"{index - 1} and {index}."
+                )
+        if points[-1] == points[0]:
+            raise ParsingError(
+                f"Polygon repeats its first vertex at closing index {len(points) - 1}."
+            )
+
+    def validate_image_bounds(
+        self,
+        *,
+        width: Any = None,
+        height: Any = None,
+    ) -> None:
+        """Ensure polygon coordinates fit dimensions supplied by image metadata."""
+        for field_name, coordinates, dimension in (
+            ("x", self.x, width),
+            ("y", self.y, height),
+        ):
+            if dimension is None:
+                continue
+            dimension_name = "width" if field_name == "x" else "height"
+            normalized_dimension = _normalize_image_dimension(
+                dimension_name,
+                dimension,
+            )
+
+            for index, coordinate in enumerate(coordinates):
+                if coordinate < 0 or coordinate > normalized_dimension:
+                    raise ParsingError(
+                        f"Polygon {field_name} coordinate at index {index} "
+                        f"is outside image bounds [0, {normalized_dimension:g}]."
+                    )
+
+
+def _normalize_image_dimension(field_name: str, value: Any) -> float:
+    error_message = f"Image {field_name} must be a positive finite number."
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ParsingError(error_message)
+    try:
+        normalized_value = float(value)
+    except OverflowError as exc:
+        raise ParsingError(error_message) from exc
+    if not math.isfinite(normalized_value) or normalized_value <= 0:
+        raise ParsingError(error_message)
+    return normalized_value
+
 
 @dataclass
 class DefectAnnotation:

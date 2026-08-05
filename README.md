@@ -40,7 +40,7 @@
 | 기능 | 하는 일 |
 |---|---|
 | 🏷️ 라벨 정규화 | `기공`, `POROSITY`, `gas_pore`를 `porosity`로 통일 |
-| 📐 Polygon 검사 | x/y 좌표 개수와 최소 꼭짓점 수 확인 |
+| 📐 Polygon 검사 | x/y 좌표 개수, 최소 꼭짓점, 중복점과 이미지 경계 확인 |
 | 🚨 오류 감지 | 올바르지 않은 annotation 항목을 즉시 알림 |
 | 🩻 검사 방식 확인 | 결함별 RT/VT modality 허용 여부 검증 |
 | 🖼️ 메타데이터 보존 | `image_id`, `filename`, `width`, `height` 유지 |
@@ -53,6 +53,8 @@
 - Python dictionary
 
 JSON의 annotation 목록 이름은 `annotations`, `shapes`, `objects` 중 하나를 사용할 수 있습니다.
+`width`와 `height`가 있으면 Polygon 좌표는 `0 ≤ x ≤ width`,
+`0 ≤ y ≤ height` 범위여야 하며 연속점과 닫힘점은 중복될 수 없습니다.
 
 ---
 
