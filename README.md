@@ -169,6 +169,19 @@ pip install -e ".[dev,cvat]"
 ./scripts/cvat-local.sh down
 ```
 
+`.env.cvat`에 관리자 계정 또는 Personal Access Token을 설정하면 canonical taxonomy로
+RT/VT Polygon Project를 생성할 수 있습니다. 같은 이름과 label 구성을 가진
+Project가 이미 있으면 새로 만들지 않고 재사용합니다.
+
+```bash
+set -a
+source .env.cvat
+set +a
+
+python -m welding_qa.cvat_project --modality RT
+python -m welding_qa.cvat_project --modality VT
+```
+
 ---
 
 ## 🔄 데이터는 이렇게 흘러가요
