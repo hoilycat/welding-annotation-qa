@@ -4,7 +4,7 @@
 
 ### 용접 결함 라벨을 가지런히 정리하는 데이터 QA 도구
 
-![version](https://img.shields.io/badge/version-0.2-E76F51?style=flat-square)
+![version](https://img.shields.io/badge/version-0.3-E76F51?style=flat-square)
 ![status](https://img.shields.io/badge/status-foundation-F4A261?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Pytest](https://img.shields.io/badge/tests-pytest-2A9D8F?style=flat-square&logo=pytest&logoColor=white)
@@ -30,12 +30,12 @@
 
 쉽게 말하면, **용접 데이터가 모델에게 들어가기 전에 한 번 정리해 주는 라벨 정리반**입니다. 🧤
 
-> 📍 현재 버전은 **v0.2**입니다.<br>
-> JSON 검증, 라벨 정규화와 CVAT Project 생성을 지원하며 Task 자동화와 dataset export는 준비 중입니다.
+> 📍 현재 버전은 **v0.3**입니다.<br>
+> JSON 검증, 라벨 정규화와 CVAT Project/Task 생성을 지원하며 annotation 동기화와 dataset export는 준비 중입니다.
 
 ---
 
-## ✨ v0.2에서 할 수 있는 일
+## ✨ v0.3에서 할 수 있는 일
 
 | 기능 | 하는 일 |
 |---|---|
@@ -173,7 +173,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 health
 powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 superuser
 ```
 
-Python SDK가 필요한 개발 환경은 서버와 같은 2.70 버전으로 설치됩니다.
+Python SDK가 필요한 개발 환경은 서버와 같은 2.71 버전으로 설치됩니다.
 
 ```bash
 pip install -e ".[dev,cvat]"
@@ -203,6 +203,14 @@ set +a
 
 python -m welding_qa.cvat_project --modality RT
 python -m welding_qa.cvat_project --modality VT
+```
+
+이미지 폴더를 Project 아래 Task로 업로드할 때는 다음 명령을 사용합니다. 같은 이름의
+Task가 있고 frame 파일명도 모두 같으면 기존 Task를 재사용합니다.
+
+```bash
+python -m welding_qa.cvat_task --modality RT --images data/rt-images
+python -m welding_qa.cvat_task --modality VT --images data/vt-images
 ```
 
 Windows PowerShell에서는 `.env.cvat`을 현재 세션에 불러온 뒤 실행합니다.
@@ -285,7 +293,8 @@ welding-annotation-qa/
 - [x] 익명 fixture와 단위 테스트 구성
 - [x] CVAT REST API 연동
 - [x] CVAT Project 자동 생성
-- [ ] CVAT Task 자동 생성과 annotation 동기화
+- [x] CVAT Task 자동 생성과 이미지 업로드
+- [ ] CVAT annotation 동기화
 - [ ] YOLO/COCO export profile
 - [ ] QA 리포트와 validation dashboard
 

@@ -11,6 +11,7 @@ from .cvat_converter import (
 from .models import DefectAnnotation, ParsingError, Polygon
 from .riawelc_reader import parse_riawelc_json
 from .taxonomy import TaxonomyConfig
+from .cvat_task import collect_image_paths, ensure_cvat_task
 
 # 내부 헬퍼는 숨기고 모델·파서·CVAT 변환 함수만 공개하는 목록
 __all__ = [
@@ -25,4 +26,6 @@ __all__ = [
     "annotations_to_cvat_shapes",
     "cvat_shape_to_annotation",
     "cvat_shapes_to_annotations",
+    "collect_image_paths",
+    "ensure_cvat_task",
 ]
