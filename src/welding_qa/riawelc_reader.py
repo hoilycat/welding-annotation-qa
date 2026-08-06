@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .models import DefectAnnotation, ParsingError, Polygon
+from .models import DefectAnnotation, ParsingError, Polygon, validate_image_dimensions
 from .taxonomy import TaxonomyConfig
 
 
@@ -57,6 +57,7 @@ def parse_riawelc_json(
         image_info = {}
     image_width = image_info.get("width", data.get("width"))
     image_height = image_info.get("height", data.get("height"))
+    validate_image_dimensions(width=image_width, height=image_height)
 
     parsed_defects: list[DefectAnnotation] = []
 

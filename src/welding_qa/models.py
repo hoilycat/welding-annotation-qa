@@ -65,17 +65,16 @@ class Polygon:
         height: Any = None,
     ) -> None:
         """Ensure polygon coordinates fit dimensions supplied by image metadata."""
-        for field_name, coordinates, dimension in (
-            ("x", self.x, width),
-            ("y", self.y, height),
+        normalized_width, normalized_height = validate_image_dimensions(
+            width=width,
+            height=height,
+        )
+        for field_name, coordinates, normalized_dimension in (
+            ("x", self.x, normalized_width),
+            ("y", self.y, normalized_height),
         ):
-            if dimension is None:
+            if normalized_dimension is None:
                 continue
-            dimension_name = "width" if field_name == "x" else "height"
-            normalized_dimension = _normalize_image_dimension(
-                dimension_name,
-                dimension,
-            )
 
             for index, coordinate in enumerate(coordinates):
                 if coordinate < 0 or coordinate > normalized_dimension:
@@ -83,6 +82,21 @@ class Polygon:
                         f"Polygon {field_name} coordinate at index {index} "
                         f"is outside image bounds [0, {normalized_dimension:g}]."
                     )
+
+
+def validate_image_dimensions(
+    *,
+    width: Any = None,
+    height: Any = None,
+) -> tuple[float | None, float | None]:
+    """Validate optional image dimensions and return normalized numeric values."""
+    normalized_width = (
+        _normalize_image_dimension("width", width) if width is not None else None
+    )
+    normalized_height = (
+        _normalize_image_dimension("height", height) if height is not None else None
+    )
+    return normalized_width, normalized_height
 
 
 def _normalize_image_dimension(field_name: str, value: Any) -> float:
