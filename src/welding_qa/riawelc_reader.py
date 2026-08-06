@@ -1,3 +1,5 @@
+"""RIAWELC 계열 JSON 입력을 내부 DefectAnnotation 목록으로 변환하는 모듈."""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +15,8 @@ def parse_riawelc_json(
     taxonomy: TaxonomyConfig,
     default_modality: str = "RT",
 ) -> list[DefectAnnotation]:
-    """Parse RIAWELC format JSON annotation and return validated DefectAnnotation instances."""
+    """파일 경로, JSON 문자열, dictionary 입력을 검증된 annotation 목록으로 바꾸는 함수."""
+    # 문자열이 실제 파일 경로인지 먼저 확인하고 아니면 JSON 본문으로 처리하는 입력 분기
     if isinstance(json_path_or_content, (str, Path)) and (
         isinstance(json_path_or_content, Path) or Path(json_path_or_content).is_file()
     ):
@@ -36,6 +39,7 @@ def parse_riawelc_json(
     if not isinstance(data, dict):
         raise ParsingError("Root JSON structure must be a dictionary object.")
 
+    # 데이터셋 버전별로 다른 annotation 목록 필드 이름을 순서대로 지원하는 코드
     annotations_field = None
     for candidate in ("annotations", "shapes", "objects"):
         if candidate in data:
@@ -47,6 +51,7 @@ def parse_riawelc_json(
     if not isinstance(annotations_list, list):
         raise ParsingError(f"Field '{annotations_field}' must be a list.")
 
+    # modality가 명시된 경우 빈 값으로 default를 덮어쓰지 못하게 직접 존재 여부를 확인하는 코드
     modality = data["modality"] if "modality" in data else default_modality
     if not isinstance(modality, str):
         raise ParsingError("Field 'modality' must be a string.")
@@ -57,10 +62,12 @@ def parse_riawelc_json(
         image_info = {}
     image_width = image_info.get("width", data.get("width"))
     image_height = image_info.get("height", data.get("height"))
+    # annotation이 0개여도 잘못된 이미지 크기를 놓치지 않게 반복문 전에 실행하는 검사
     validate_image_dimensions(width=image_width, height=image_height)
 
     parsed_defects: list[DefectAnnotation] = []
 
+    # 한 항목이라도 잘못되면 일부 결과를 반환하지 않고 파일 전체를 거부하는 처리
     for idx, item in enumerate(annotations_list):
         if not isinstance(item, dict):
             raise ParsingError(f"Annotation item at index {idx} must be a dictionary object.")
@@ -69,6 +76,7 @@ def parse_riawelc_json(
         if not raw_label:
             raise ParsingError(f"Annotation item at index {idx} missing label field.")
 
+        # 원본 라벨을 taxonomy의 canonical slug로 통일하고 modality 정책까지 확인하는 코드
         try:
             canonical_slug = taxonomy.get_canonical_slug(str(raw_label))
         except ValueError as exc:
@@ -81,6 +89,7 @@ def parse_riawelc_json(
                 f"for canonical label '{canonical_slug}'."
             )
 
+        # polygon.x/y, points[[x,y]], 항목 직속 x/y 형식을 모두 받는 호환 처리
         if "polygon" in item:
             poly_data = item["polygon"]
         elif "points" in item:
@@ -95,6 +104,7 @@ def parse_riawelc_json(
             xs = []
             ys = []
             for point_idx, point in enumerate(poly_data):
+                # 잘못된 point를 조용히 제거하지 않고 annotation 전체를 거부하는 검사
                 if not isinstance(point, (list, tuple)) or len(point) != 2:
                     raise ParsingError(
                         f"Annotation item at index {idx}, point at index {point_idx} "
@@ -119,12 +129,14 @@ def parse_riawelc_json(
                 f"len(x)={len(xs)}, len(y)={len(ys)}"
             )
 
+        # Polygon 모델의 숫자·중복점 검사와 이미지 경계 검사를 한곳에서 감싸는 코드
         try:
             polygon = Polygon(x=tuple(xs), y=tuple(ys))
             polygon.validate_image_bounds(width=image_width, height=image_height)
         except ParsingError as exc:
             raise ParsingError(f"Annotation item at index {idx}: {exc}") from exc
 
+        # 학습 전후 추적에 필요한 원본 이미지 메타데이터를 그대로 보존하는 코드
         parsed_defects.append(
             DefectAnnotation(
                 label_original=str(raw_label),

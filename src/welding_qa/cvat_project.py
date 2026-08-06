@@ -1,3 +1,5 @@
+"""Canonical taxonomy로 CVAT Project를 생성하거나 기존 Project를 재사용하는 CLI 모듈."""
+
 from __future__ import annotations
 
 import argparse
@@ -13,6 +15,7 @@ from .models import ParsingError
 from .taxonomy import TaxonomyConfig
 
 
+# taxonomy 순서를 시각적으로 구분하기 위해 순환해서 사용하는 기본 label 색상
 _LABEL_COLORS = (
     "#E76F51",
     "#F4A261",
@@ -24,11 +27,13 @@ _LABEL_COLORS = (
 
 
 class CvatIntegrationError(RuntimeError):
-    """Raised when the CVAT SDK cannot connect or authenticate."""
+    """CVAT SDK 연결·인증·Project 상태가 기대와 다를 때 사용하는 예외."""
 
 
 @dataclass(frozen=True)
 class CvatSettings:
+    """환경변수에서 읽은 CVAT 접속 정보만 보관하는 설정 모델."""
+
     url: str
     username: str | None = None
     password: str | None = None
@@ -36,6 +41,7 @@ class CvatSettings:
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] | None = None) -> CvatSettings:
+        # PAT가 있으면 계정 비밀번호보다 우선해서 사용하는 인증 정책
         values = os.environ if environ is None else environ
         url = values.get("CVAT_URL", "http://localhost:8080").strip()
         username = values.get("CVAT_USERNAME", "").strip() or None
@@ -54,7 +60,8 @@ class CvatSettings:
 
 
 def connect_cvat(settings: CvatSettings) -> Any:
-    """Create an authenticated, version-checked CVAT SDK client."""
+    """인증과 서버 버전 확인을 마친 CVAT SDK client를 만드는 함수."""
+    # cvat 기능을 사용하지 않는 설치에서는 SDK가 필수가 아니도록 지연 import하는 코드
     try:
         from cvat_sdk import make_client
     except ImportError as exc:
@@ -62,6 +69,7 @@ def connect_cvat(settings: CvatSettings) -> Any:
             'CVAT SDK is not installed. Run: pip install -e ".[dev,cvat]"'
         ) from exc
 
+    # 네트워크·인증·버전 오류를 CLI가 한 종류로 안내할 수 있게 감싸는 외부 SDK 경계
     try:
         if settings.access_token:
             client = make_client(settings.url, access_token=settings.access_token)
@@ -81,7 +89,7 @@ def build_cvat_project_spec(
     taxonomy: TaxonomyConfig,
     modality: str,
 ) -> dict[str, Any]:
-    """Build a CVAT project payload from modality-compatible canonical labels."""
+    """해당 modality에 허용된 canonical label로 CVAT Project payload를 만드는 함수."""
     project_name = name.strip() if isinstance(name, str) else ""
     if not project_name:
         raise ParsingError("CVAT project name must be a non-empty string.")
@@ -89,6 +97,7 @@ def build_cvat_project_spec(
         raise ParsingError("CVAT project modality must be a non-empty string.")
 
     normalized_modality = modality.strip().upper()
+    # YAML 순서를 그대로 유지해 Project label 표시 순서와 색상을 안정적으로 만드는 코드
     labels = []
     for index, canonical_slug in enumerate(taxonomy.canonical_classes):
         if taxonomy.is_modality_allowed(canonical_slug, normalized_modality):
@@ -115,8 +124,9 @@ def ensure_cvat_project(
     taxonomy: TaxonomyConfig,
     modality: str,
 ) -> tuple[Any, bool]:
-    """Create a taxonomy project, or reuse an exact-name project with matching labels."""
+    """같은 Project가 있으면 검증 후 재사용하고 없으면 새로 만드는 함수."""
     spec = build_cvat_project_spec(name, taxonomy, modality)
+    # 이름이 같은 Project 전체를 찾아 중복 생성을 막는 idempotent 처리
     matching_projects = [
         project
         for project in client.projects.list()
@@ -129,6 +139,7 @@ def ensure_cvat_project(
         )
     if matching_projects:
         project = matching_projects[0]
+        # label 이름과 shape type이 정확히 같은 경우에만 안전한 재사용으로 판단하는 코드
         expected_labels = {
             label["name"]: label["type"] for label in spec["labels"]
         }
@@ -147,16 +158,19 @@ def ensure_cvat_project(
 
 
 def _field(value: Any, name: str) -> Any:
+    # 테스트 dictionary와 실제 CVAT SDK 객체를 같은 방식으로 읽기 위한 호환 함수
     if isinstance(value, Mapping):
         return value.get(name)
     return getattr(value, name, None)
 
 
 def _enum_value(value: Any) -> Any:
+    # SDK enum과 일반 문자열을 비교 가능한 값으로 맞추는 함수
     return getattr(value, "value", value)
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    # Project 이름과 taxonomy 위치를 필요할 때 덮어쓸 수 있게 구성한 CLI 인자
     parser = argparse.ArgumentParser(
         description="Create or reuse a taxonomy-backed CVAT polygon project."
     )
@@ -172,6 +186,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """환경 설정부터 Project 생성 결과 출력까지 연결하는 CLI 진입점."""
     args = _build_parser().parse_args(argv)
     modality = args.modality.strip().upper()
     project_name = args.name or f"Welding QA {modality}"
@@ -180,6 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
         settings = CvatSettings.from_environ()
         client = connect_cvat(settings)
+        # 성공·실패와 관계없이 SDK 세션을 닫아 연결 자원을 정리하는 코드
         try:
             project, created = ensure_cvat_project(
                 client,
@@ -193,6 +209,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    # 자동화 스크립트가 읽을 수 있도록 생성 여부와 URL을 한 줄 JSON으로 출력하는 코드
     print(
         json.dumps(
             {

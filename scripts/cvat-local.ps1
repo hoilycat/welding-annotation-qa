@@ -4,12 +4,15 @@ param(
     [string]$Action
 )
 
+# 예상하지 못한 변수와 명령 오류를 즉시 중단하는 PowerShell 안전 설정
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# 실행 위치와 관계없이 저장소 루트와 설정 파일 위치를 계산하는 코드
 $script:RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $script:EnvFile = Join-Path $script:RepoRoot ".env.cvat"
 
+# KEY=VALUE 형식의 .env.cvat을 현재 PowerShell process 환경으로 불러오는 함수
 function Import-CvatEnvFile {
     if (-not (Test-Path -LiteralPath $script:EnvFile -PathType Leaf)) {
         return
@@ -21,6 +24,7 @@ function Import-CvatEnvFile {
             continue
         }
 
+        # 값 내부의 '=' 문자를 보존하기 위해 첫 번째 구분자에서만 나누는 코드
         $parts = $trimmed -split "=", 2
         if ($parts.Count -ne 2 -or $parts[0] -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
             throw "Invalid environment entry in $($script:EnvFile): $line"
@@ -28,6 +32,7 @@ function Import-CvatEnvFile {
 
         $name = $parts[0]
         $value = $parts[1]
+        # 단순한 따옴표로 감싼 값을 Bash source 결과와 비슷하게 맞추는 처리
         if ($value.Length -ge 2) {
             $first = $value[0]
             $last = $value[$value.Length - 1]
@@ -39,6 +44,7 @@ function Import-CvatEnvFile {
     }
 }
 
+# 환경변수가 없거나 빈 경우 플랫폼 공통 기본값을 돌려주는 함수
 function Get-CvatSetting {
     param(
         [Parameter(Mandatory = $true)]
@@ -54,6 +60,7 @@ function Get-CvatSetting {
     return $value
 }
 
+# 지원하는 하위 명령과 용도를 출력하는 도움말
 function Show-Usage {
     @"
 Usage: powershell -ExecutionPolicy Bypass -File scripts/cvat-local.ps1 <command>
@@ -71,6 +78,7 @@ Commands:
 "@
 }
 
+# PowerShell이 native command 종료 코드를 놓치지 않게 예외로 바꾸는 wrapper
 function Invoke-NativeCommand {
     param(
         [Parameter(Mandatory = $true)]
@@ -84,6 +92,7 @@ function Invoke-NativeCommand {
     }
 }
 
+# Docker Desktop daemon이 실제로 응답하는지 확인하는 사전 검사
 function Assert-DockerRunning {
     & docker info *> $null
     if ($LASTEXITCODE -ne 0) {
@@ -91,6 +100,7 @@ function Assert-DockerRunning {
     }
 }
 
+# 고정한 CVAT tag를 shallow clone하고 기존 checkout의 버전도 확인하는 코드
 function Initialize-CvatSource {
     $gitDirectory = Join-Path $script:RuntimeDir ".git"
     if (-not (Test-Path -LiteralPath $gitDirectory -PathType Container)) {
@@ -112,6 +122,7 @@ function Initialize-CvatSource {
     }
 }
 
+# CVAT checkout에서 host, port, version을 전달해 docker compose를 실행하는 함수
 function Invoke-CvatCompose {
     param([string[]]$ArgumentList)
 
@@ -129,6 +140,7 @@ function Invoke-CvatCompose {
 }
 
 try {
+    # .env 값, process 환경변수, 기본값 순서로 최종 실행 설정을 만드는 코드
     Import-CvatEnvFile
 
     $script:CvatVersion = Get-CvatSetting -Name "CVAT_VERSION" -Default "v2.70.0"
@@ -139,6 +151,7 @@ try {
         (Get-CvatSetting -Name "CVAT_RUNTIME_DIR" -Default $defaultRuntimeDir)
     )
 
+    # 사용자 명령을 공통 준비 단계와 실제 Docker 작업으로 연결하는 분기
     switch ($Action) {
         "bootstrap" {
             Initialize-CvatSource
@@ -192,6 +205,7 @@ try {
     }
 }
 catch {
+    # 내부 stack trace 대신 사용자가 바로 조치할 수 있는 한 줄 오류를 출력하는 처리
     [Console]::Error.WriteLine("error: $($_.Exception.Message)")
     exit 1
 }
