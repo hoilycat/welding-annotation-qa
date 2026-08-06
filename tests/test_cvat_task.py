@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -284,3 +286,15 @@ def test_export_rejects_frame_stem_collision():
 
     with pytest.raises(ParsingError, match="CVAT frame filenames must have unique stems"):
         export_task_annotations(task, project, taxonomy)
+
+
+def test_module_help_does_not_emit_runtime_warning():
+    result = subprocess.run(
+        [sys.executable, "-m", "welding_qa.cvat_task", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "RuntimeWarning" not in result.stderr

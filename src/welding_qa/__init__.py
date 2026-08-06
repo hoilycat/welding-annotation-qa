@@ -11,7 +11,6 @@ from .cvat_converter import (
 from .models import DefectAnnotation, ParsingError, Polygon
 from .riawelc_reader import parse_riawelc_json
 from .taxonomy import TaxonomyConfig
-from .cvat_task import collect_image_paths, ensure_cvat_task
 
 # 내부 헬퍼는 숨기고 모델·파서·CVAT 변환 함수만 공개하는 목록
 __all__ = [
@@ -29,3 +28,13 @@ __all__ = [
     "collect_image_paths",
     "ensure_cvat_task",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """CVAT Task API를 요청할 때만 모듈을 불러와 CLI 선행 import를 피하는 함수."""
+    if name in {"collect_image_paths", "ensure_cvat_task"}:
+        from importlib import import_module
+
+        cvat_task = import_module(".cvat_task", __name__)
+        return getattr(cvat_task, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -45,6 +45,7 @@
 | 🩻 검사 방식 확인 | 결함별 RT/VT modality 허용 여부 검증 |
 | 🖼️ 메타데이터 보존 | `image_id`, `filename`, `width`, `height` 유지 |
 | 🌱 정상 이미지 허용 | 결함이 없는 `annotations: []`도 정상 처리 |
+| 📤 CVAT 등록 | taxonomy Project와 이미지 Task를 생성하거나 안전하게 재사용 |
 
 입력은 다음 세 가지 형태를 지원합니다.
 
@@ -244,6 +245,8 @@ Get-Content .env.cvat | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | 
 
 python -m welding_qa.cvat_project --modality RT
 python -m welding_qa.cvat_project --modality VT
+python -m welding_qa.cvat_task --modality RT --images data/rt-images
+python -m welding_qa.cvat_task --modality VT --images data/vt-images
 ```
 
 ---
@@ -293,10 +296,14 @@ welding-annotation-qa/
 │   ├── models.py              # Polygon과 annotation 모델
 │   ├── taxonomy.py            # 라벨 정규화
 │   ├── riawelc_reader.py      # JSON 파싱과 검증
-│   └── cvat_converter.py      # CVAT Polygon 양방향 변환
+│   ├── cvat_converter.py      # CVAT Polygon 양방향 변환
+│   ├── cvat_project.py        # CVAT Project 생성·재사용
+│   └── cvat_task.py           # CVAT Task 생성·이미지 업로드
 ├── tests/
 │   ├── fixtures/              # 익명 샘플 JSON
 │   ├── test_cvat_converter.py
+│   ├── test_cvat_project.py
+│   ├── test_cvat_task.py
 │   ├── test_taxonomy.py
 │   └── test_riawelc_reader.py
 └── docs/
