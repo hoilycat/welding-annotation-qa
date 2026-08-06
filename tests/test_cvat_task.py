@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -129,3 +131,15 @@ def test_ensure_task_rejects_duplicate_names(tmp_path: Path):
     tasks = [FakeTask(1, "RT batch", ["001.png"]), FakeTask(2, "RT batch", ["001.png"])]
     with pytest.raises(CvatIntegrationError, match="Multiple CVAT tasks"):
         ensure_cvat_task(FakeClient(), FakeProject(tasks), "RT batch", images)
+
+
+def test_module_help_does_not_emit_runtime_warning():
+    result = subprocess.run(
+        [sys.executable, "-m", "welding_qa.cvat_task", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "RuntimeWarning" not in result.stderr
