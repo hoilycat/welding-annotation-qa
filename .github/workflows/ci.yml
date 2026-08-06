@@ -39,3 +39,23 @@ jobs:
 
       - name: Compile Python sources
         run: python -m compileall -q src tests
+
+  windows-script:
+    name: Windows PowerShell script
+    runs-on: windows-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Smoke-test local CVAT helper
+        shell: powershell
+        run: |
+          $output = powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 url
+          if ($LASTEXITCODE -ne 0) {
+              throw "cvat-local.ps1 exited with code $LASTEXITCODE"
+          }
+          if ($output.Trim() -ne "http://localhost:8080") {
+              throw "Unexpected CVAT URL: $output"
+          }

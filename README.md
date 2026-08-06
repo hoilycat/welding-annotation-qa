@@ -31,7 +31,7 @@
 쉽게 말하면, **용접 데이터가 모델에게 들어가기 전에 한 번 정리해 주는 라벨 정리반**입니다. 🧤
 
 > 📍 현재 버전은 **v0.1**입니다.<br>
-> JSON 검증과 라벨 정규화에 집중하며 CVAT 연동과 dataset export는 아직 준비 중입니다.
+> JSON 검증, 라벨 정규화와 CVAT Project 생성을 지원하며 Task 자동화와 dataset export는 준비 중입니다.
 
 ---
 
@@ -140,13 +140,22 @@ cvat_payload = {
 
 ### 로컬 CVAT 환경 실행하기
 
-Docker Desktop을 실행한 뒤 아래 명령으로 프로젝트에 고정된 CVAT 버전을
-준비하고 시작할 수 있습니다.
+Docker Desktop을 실행한 뒤 프로젝트에 고정된 CVAT 버전을 준비하고 시작할 수 있습니다.
+
+macOS/Linux:
 
 ```bash
 cp .env.cvat.example .env.cvat
 ./scripts/cvat-local.sh bootstrap
 ./scripts/cvat-local.sh up
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.cvat.example .env.cvat
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 bootstrap
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 up
 ```
 
 CVAT는 기본적으로 <http://localhost:8080>에서 열립니다. 최초 관리자 계정은
@@ -155,6 +164,13 @@ CVAT는 기본적으로 <http://localhost:8080>에서 열립니다. 최초 관�
 ```bash
 ./scripts/cvat-local.sh health
 ./scripts/cvat-local.sh superuser
+```
+
+Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 health
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 superuser
 ```
 
 Python SDK가 필요한 개발 환경은 서버와 같은 2.70 버전으로 설치됩니다.
@@ -171,6 +187,11 @@ pip install -e ".[dev,cvat]"
 ./scripts/cvat-local.sh down
 ```
 
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 status
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 down
+```
+
 `.env.cvat`에 관리자 계정 또는 Personal Access Token을 설정하면 canonical taxonomy로
 RT/VT Polygon Project를 생성할 수 있습니다. 같은 이름과 label 구성을 가진
 Project가 이미 있으면 새로 만들지 않고 재사용합니다.
@@ -179,6 +200,18 @@ Project가 이미 있으면 새로 만들지 않고 재사용합니다.
 set -a
 source .env.cvat
 set +a
+
+python -m welding_qa.cvat_project --modality RT
+python -m welding_qa.cvat_project --modality VT
+```
+
+Windows PowerShell에서는 `.env.cvat`을 현재 세션에 불러온 뒤 실행합니다.
+
+```powershell
+Get-Content .env.cvat | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object {
+    $name, $value = $_ -split '=', 2
+    Set-Item -Path "Env:$name" -Value $value
+}
 
 python -m welding_qa.cvat_project --modality RT
 python -m welding_qa.cvat_project --modality VT
@@ -249,8 +282,9 @@ welding-annotation-qa/
 - [x] RIAWELC JSON reader 구현
 - [x] Polygon 및 modality 기본 검증
 - [x] 익명 fixture와 단위 테스트 구성
-- [ ] CVAT REST API 연동
-- [ ] CVAT Project/Task 자동 생성
+- [x] CVAT REST API 연동
+- [x] CVAT Project 자동 생성
+- [ ] CVAT Task 자동 생성과 annotation 동기화
 - [ ] YOLO/COCO export profile
 - [ ] QA 리포트와 validation dashboard
 

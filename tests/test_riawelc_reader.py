@@ -323,3 +323,23 @@ def test_parse_invalid_image_width_raises_error(
             },
             taxonomy,
         )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("width", 0, "Image width must be a positive finite number"),
+        ("height", "bad", "Image height must be a positive finite number"),
+    ],
+)
+def test_parse_invalid_image_dimensions_with_empty_annotations_raises_error(
+    taxonomy: TaxonomyConfig,
+    field_name: str,
+    value: object,
+    message: str,
+):
+    with pytest.raises(ParsingError, match=message):
+        parse_riawelc_json(
+            {field_name: value, "annotations": []},
+            taxonomy,
+        )
