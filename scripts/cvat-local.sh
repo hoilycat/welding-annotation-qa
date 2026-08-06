@@ -18,7 +18,7 @@ cvat_port="${CVAT_PORT:-8080}"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/cvat-local.sh <command>
+Usage (macOS/Linux): scripts/cvat-local.sh <command>
 
 Commands:
   bootstrap   Clone the pinned CVAT release into .local/cvat
