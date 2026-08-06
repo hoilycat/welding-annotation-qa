@@ -15,7 +15,7 @@ if [[ -f "$env_file" ]]; then
     set +a
 fi
 
-cvat_version="${CVAT_VERSION:-v2.70.0}"
+cvat_version="${CVAT_VERSION:-v2.71.0}"
 cvat_host="${CVAT_HOST:-localhost}"
 cvat_port="${CVAT_PORT:-8080}"
 

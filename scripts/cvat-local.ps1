@@ -143,7 +143,7 @@ try {
     # .env 값, process 환경변수, 기본값 순서로 최종 실행 설정을 만드는 코드
     Import-CvatEnvFile
 
-    $script:CvatVersion = Get-CvatSetting -Name "CVAT_VERSION" -Default "v2.70.0"
+    $script:CvatVersion = Get-CvatSetting -Name "CVAT_VERSION" -Default "v2.71.0"
     $script:CvatHost = Get-CvatSetting -Name "CVAT_HOST" -Default "localhost"
     $script:CvatPort = Get-CvatSetting -Name "CVAT_PORT" -Default "8080"
     $defaultRuntimeDir = Join-Path $script:RepoRoot ".local\cvat"
