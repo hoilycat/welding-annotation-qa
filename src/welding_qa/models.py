@@ -15,10 +15,13 @@ class ParsingError(ValueError):
 
 @dataclass(frozen=True)
 class Polygon:
+    """정규화된 꼭짓점과 유효한 단순 다각형 조건을 보장하는 불변 모델."""
+
     x: tuple[float, ...]
     y: tuple[float, ...]
 
     def __post_init__(self) -> None:
+        """생성 시 좌표 타입, 면적, 중복점과 자기교차를 한 번에 검증하는 함수."""
         # Polygon을 만들자마자 구조를 보장해 이후 코드가 좌표 개수를 재검사하지 않게 하는 코드
         if len(self.x) != len(self.y):
             raise ParsingError(
@@ -92,6 +95,7 @@ class Polygon:
             width=width,
             height=height,
         )
+        # x는 width, y는 height와 각각 비교하고 크기가 생략된 축은 경계 검사를 건너뜀
         for field_name, coordinates, normalized_dimension in (
             ("x", self.x, normalized_width),
             ("y", self.y, normalized_height),
@@ -124,6 +128,7 @@ def validate_image_dimensions(
 
 
 def _normalize_image_dimension(field_name: str, value: Any) -> float:
+    """이미지 width/height를 양의 유한한 float 값으로 정규화하는 함수."""
     # 좌표와 달리 이미지 크기는 0보다 커야 유효한 것으로 처리하는 검사
     error_message = f"Image {field_name} must be a positive finite number."
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -141,6 +146,7 @@ def _normalize_geometry_points(
     points: tuple[tuple[float, float], ...],
 ) -> tuple[tuple[float, float], ...]:
     """좌표를 -1~1 범위로 축소해 기하 연산 overflow를 막는 함수."""
+    # 가장 큰 절댓값을 공통 scale로 사용해 다각형의 상대적인 모양은 보존
     coordinate_scale = max(max(abs(x), abs(y)) for x, y in points)
     if coordinate_scale == 0.0:
         return points
@@ -149,6 +155,7 @@ def _normalize_geometry_points(
 
 def _geometry_tolerance(points: tuple[tuple[float, float], ...]) -> float:
     """Polygon 범위에 비례하는 면적·orientation 비교 tolerance를 만드는 함수."""
+    # 좌표 범위의 제곱을 기준으로 부동소수점 면적 비교 오차를 조정
     xs, ys = zip(*points)
     span = max(max(xs) - min(xs), max(ys) - min(ys))
     return span * span * 1e-12
@@ -175,6 +182,7 @@ def _all_points_collinear(
     tolerance: float,
 ) -> bool:
     """가장 멀리 떨어진 축의 두 점을 기준으로 모든 꼭짓점이 일직선인지 확인하는 함수."""
+    # x/y 중 더 넓게 퍼진 축의 양 끝점을 기준선으로 골라 수치 오차를 줄임
     min_x_point = min(points, key=lambda point: point[0])
     max_x_point = max(points, key=lambda point: point[0])
     min_y_point = min(points, key=lambda point: point[1])
@@ -241,12 +249,14 @@ def _segments_intersect(
         orientations
     )
 
+    # 각 선분의 양 끝점이 상대 선분의 서로 반대편에 있으면 내부에서 교차
     if (
         first_to_second_start * first_to_second_end < 0
         and second_to_first_start * second_to_first_end < 0
     ):
         return True
 
+    # orientation이 0인 끝점은 bounding box까지 확인해 접촉·겹침 여부를 판정
     return (
         first_to_second_start == 0
         and _point_on_segment(second_start, first_start, first_end, tolerance)

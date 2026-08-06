@@ -20,6 +20,7 @@ from .models import ParsingError
 from .taxonomy import TaxonomyConfig
 
 
+# CVAT가 로컬 이미지 resource로 받을 수 있도록 허용하는 파일 확장자 목록
 IMAGE_EXTENSIONS = frozenset({".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"})
 
 
@@ -29,6 +30,7 @@ def collect_image_paths(image_root: str | Path) -> list[Path]:
     if not root.is_dir():
         raise ParsingError(f"Image root must be an existing directory: {root}")
 
+    # 운영체제나 파일 탐색 순서와 무관하게 같은 frame 순서를 만들도록 상대 경로로 정렬
     image_paths = sorted(
         (
             path.resolve()
@@ -55,6 +57,7 @@ def collect_image_paths(image_root: str | Path) -> list[Path]:
 
 def build_cvat_task_spec(name: str, project_id: int) -> dict[str, Any]:
     """Project에 연결되는 CVAT Task 생성 payload를 만드는 함수."""
+    # 공백 이름과 bool처럼 int로 취급되는 잘못된 project ID를 SDK 호출 전에 차단
     task_name = name.strip() if isinstance(name, str) else ""
     if not task_name:
         raise ParsingError("CVAT task name must be a non-empty string.")
@@ -75,6 +78,8 @@ def ensure_cvat_task(
     normalized_paths = _validate_image_paths(image_paths)
     project_id = _field(project, "id")
     spec = build_cvat_task_spec(name, project_id)
+
+    # 같은 Project 안에서 이름이 같은 Task만 찾아 중복 생성을 막는 멱등 처리
     matching_tasks = [
         task for task in project.get_tasks() if _field(task, "name") == spec["name"]
     ]
@@ -85,6 +90,7 @@ def ensure_cvat_task(
         )
     if matching_tasks:
         task = matching_tasks[0]
+        # 이름뿐 아니라 정렬된 frame 파일명까지 같아야 동일한 Task로 안전하게 재사용
         expected_names = [path.name for path in normalized_paths]
         actual_names = [
             Path(str(_field(frame, "name"))).name for frame in task.get_frames_info()
@@ -96,6 +102,7 @@ def ensure_cvat_task(
             )
         return task, False
 
+    # 일치하는 Task가 없을 때만 SDK가 로컬 파일을 업로드하며 새 Task를 생성
     resource_type = _get_local_resource_type()
     task = client.tasks.create_from_data(
         spec=spec,
@@ -113,6 +120,7 @@ def _validate_image_paths(image_paths: Sequence[str | Path]) -> tuple[Path, ...]
     if not image_paths:
         raise ParsingError("CVAT task requires at least one image file.")
 
+    # SDK에 넘기기 전에 각 경로의 타입, 존재 여부와 지원 확장자를 순서대로 검증
     normalized = []
     for index, value in enumerate(image_paths):
         if not isinstance(value, (str, Path)):
@@ -126,6 +134,7 @@ def _validate_image_paths(image_paths: Sequence[str | Path]) -> tuple[Path, ...]
             raise ParsingError(f"Image path at index {index} has an unsupported extension: {path}")
         normalized.append(path.resolve())
 
+    # CVAT frame 비교는 basename을 사용하므로 대소문자만 다른 중복 이름도 허용하지 않음
     names = [path.name.casefold() for path in normalized]
     if len(names) != len(set(names)):
         raise ParsingError("CVAT task image filenames must be unique.")
@@ -151,6 +160,8 @@ def _field(value: Any, name: str) -> Any:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """CVAT Task 업로드 CLI가 지원하는 명령행 인자를 구성하는 함수."""
+    # 자동화와 수동 실행 모두에서 Project·Task 이름을 필요할 때 덮어쓸 수 있는 CLI 인자
     parser = argparse.ArgumentParser(
         description="Create or reuse a CVAT task and upload a local image directory."
     )
@@ -175,11 +186,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     task_name = args.task_name or f"{project_name} - {args.images.name}"
 
     try:
+        # taxonomy와 이미지 입력을 먼저 검증한 다음 인증된 SDK client를 생성
         taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
         image_paths = collect_image_paths(args.images)
         settings = CvatSettings.from_environ()
         client = connect_cvat(settings)
         try:
+            # 상위 Project를 먼저 보장한 뒤 그 안에서 Task 생성 또는 재사용을 수행
             project, project_created = ensure_cvat_project(
                 client,
                 project_name,
@@ -193,11 +206,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 image_paths,
             )
         finally:
+            # 생성·재사용 도중 오류가 나도 SDK의 HTTP session은 항상 정리
             client.close()
     except (CvatIntegrationError, ParsingError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    # shell이나 후속 자동화가 생성 여부와 CVAT URL을 읽을 수 있도록 한 줄 JSON으로 출력
     print(
         json.dumps(
             {

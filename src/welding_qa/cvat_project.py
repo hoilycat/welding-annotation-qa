@@ -41,6 +41,7 @@ class CvatSettings:
 
     @classmethod
     def from_environ(cls, environ: Mapping[str, str] | None = None) -> CvatSettings:
+        """환경변수에서 URL과 PAT 또는 계정 인증정보를 검증해 읽는 함수."""
         # PAT가 있으면 계정 비밀번호보다 우선해서 사용하는 인증 정책
         values = os.environ if environ is None else environ
         url = values.get("CVAT_URL", "http://localhost:8080").strip()
@@ -90,6 +91,7 @@ def build_cvat_project_spec(
     modality: str,
 ) -> dict[str, Any]:
     """해당 modality에 허용된 canonical label로 CVAT Project payload를 만드는 함수."""
+    # SDK에 잘못된 Project 이름이나 modality가 전달되기 전에 사용자 입력을 정규화
     project_name = name.strip() if isinstance(name, str) else ""
     if not project_name:
         raise ParsingError("CVAT project name must be a non-empty string.")
@@ -154,10 +156,12 @@ def ensure_cvat_project(
             )
         return project, False
 
+    # 같은 이름의 Project가 없을 때만 taxonomy label 전체를 포함해 새로 생성
     return client.projects.create(spec), True
 
 
 def _field(value: Any, name: str) -> Any:
+    """dictionary와 SDK resource 객체에서 같은 방식으로 필드를 읽는 함수."""
     # 테스트 dictionary와 실제 CVAT SDK 객체를 같은 방식으로 읽기 위한 호환 함수
     if isinstance(value, Mapping):
         return value.get(name)
@@ -165,11 +169,13 @@ def _field(value: Any, name: str) -> Any:
 
 
 def _enum_value(value: Any) -> Any:
+    """SDK enum이면 원시 값을 꺼내고 일반 값이면 그대로 반환하는 함수."""
     # SDK enum과 일반 문자열을 비교 가능한 값으로 맞추는 함수
     return getattr(value, "value", value)
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """CVAT Project 생성 CLI가 지원하는 명령행 인자를 구성하는 함수."""
     # Project 이름과 taxonomy 위치를 필요할 때 덮어쓸 수 있게 구성한 CLI 인자
     parser = argparse.ArgumentParser(
         description="Create or reuse a taxonomy-backed CVAT polygon project."
@@ -192,6 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     project_name = args.name or f"Welding QA {modality}"
 
     try:
+        # 로컬 taxonomy와 인증 설정을 읽은 뒤 호환성 검사를 마친 SDK client를 준비
         taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
         settings = CvatSettings.from_environ()
         client = connect_cvat(settings)

@@ -14,6 +14,7 @@ def polygon_to_cvat_points(polygon: Polygon) -> list[float]:
     if not isinstance(polygon, Polygon):
         raise ParsingError("CVAT polygon conversion requires a Polygon instance.")
 
+    # 내부의 (x, y) 꼭짓점 순서를 유지하며 CVAT 형식인 [x1, y1, ...]로 평탄화
     return [coordinate for point in zip(polygon.x, polygon.y) for coordinate in point]
 
 
@@ -66,6 +67,7 @@ def annotations_to_cvat_shapes(
     frame: int = 0,
 ) -> list[dict[str, Any]]:
     """canonical slug와 CVAT label ID의 매핑을 사용해 여러 annotation을 변환하는 함수."""
+    # 입력 순서를 그대로 보존해 annotation과 생성된 CVAT shape의 대응 관계를 유지
     shapes: list[dict[str, Any]] = []
     for index, annotation in enumerate(annotations):
         if not isinstance(annotation, DefectAnnotation):
@@ -107,6 +109,7 @@ def cvat_shape_to_annotation(
     if shape.get("type") != "polygon":
         raise ParsingError("CVAT shape field 'type' must be 'polygon'.")
 
+    # 서버에서 받은 label/frame 식별자는 음수가 아닌 정수만 허용
     label_id = shape.get("label_id")
     _validate_non_negative_integer("label_id", label_id)
     if label_id not in label_names:
@@ -120,6 +123,7 @@ def cvat_shape_to_annotation(
     if not modality.strip():
         raise ParsingError("CVAT annotation modality must not be empty.")
 
+    # CVAT의 숫자 label ID를 Project에서 조회한 사람이 읽는 label 이름으로 복원
     raw_label = label_names[label_id]
     if not isinstance(raw_label, str) or not raw_label.strip():
         raise ParsingError(f"CVAT label name for ID '{label_id}' must be a non-empty string.")
@@ -137,6 +141,7 @@ def cvat_shape_to_annotation(
 
     if "points" not in shape:
         raise ParsingError("CVAT polygon shape missing required 'points' field.")
+    # 좌표 오류에 CVAT shape 문맥을 붙여 호출자가 원인을 구분할 수 있게 변환
     try:
         polygon = polygon_from_cvat_points(shape["points"])
     except ParsingError as exc:
@@ -176,6 +181,7 @@ def cvat_shapes_to_annotations(
     modality: str = "RT",
 ) -> list[DefectAnnotation]:
     """여러 CVAT shape를 변환하고 실패 메시지에 shape 인덱스를 붙이는 함수."""
+    # 하나라도 잘못된 shape가 있으면 부분 결과 대신 해당 인덱스를 포함한 오류를 반환
     annotations: list[DefectAnnotation] = []
     for index, shape in enumerate(shapes):
         try:
@@ -193,6 +199,7 @@ def cvat_shapes_to_annotations(
 
 
 def _validate_non_negative_integer(field_name: str, value: Any) -> None:
+    """CVAT 식별자와 frame 값이 음수가 아닌 실제 정수인지 확인하는 함수."""
     # bool이 int로 통과하는 Python 특성을 막으면서 CVAT ID와 frame 범위를 확인하는 검사
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ParsingError(f"CVAT shape field '{field_name}' must be a non-negative integer.")

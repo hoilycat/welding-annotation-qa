@@ -57,6 +57,8 @@ def parse_riawelc_json(
         raise ParsingError("Field 'modality' must be a string.")
     if not modality.strip():
         raise ParsingError("Field 'modality' must not be empty.")
+
+    # 중첩 image_info를 우선하되 구형 최상위 이미지 메타데이터도 계속 지원
     image_info = data.get("image_info")
     if not isinstance(image_info, dict):
         image_info = {}
@@ -118,6 +120,7 @@ def parse_riawelc_json(
         if xs is None or ys is None:
             raise ParsingError(f"Annotation item at index {idx} missing 'x' and 'y' polygon coordinates.")
 
+        # 문자열처럼 순회 가능한 값이 좌표 목록으로 잘못 통과하지 않도록 타입을 제한
         if not isinstance(xs, (list, tuple)) or not isinstance(ys, (list, tuple)):
             raise ParsingError(
                 f"Annotation item at index {idx} polygon fields 'x' and 'y' must be lists or tuples."
