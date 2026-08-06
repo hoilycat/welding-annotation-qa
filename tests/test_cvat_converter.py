@@ -209,7 +209,7 @@ def test_cvat_shapes_to_annotations_adds_shape_index_to_errors(
                     "type": "polygon",
                     "frame": 0,
                     "label_id": 7,
-                    "points": [1, 2, 3, 4, 5, 6],
+                    "points": [1, 2, 4, 2, 2, 5],
                 },
                 {
                     "type": "polygon",

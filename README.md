@@ -4,7 +4,7 @@
 
 ### 용접 결함 라벨을 가지런히 정리하는 데이터 QA 도구
 
-![version](https://img.shields.io/badge/version-0.1-E76F51?style=flat-square)
+![version](https://img.shields.io/badge/version-0.2-E76F51?style=flat-square)
 ![status](https://img.shields.io/badge/status-foundation-F4A261?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Pytest](https://img.shields.io/badge/tests-pytest-2A9D8F?style=flat-square&logo=pytest&logoColor=white)
@@ -30,17 +30,17 @@
 
 쉽게 말하면, **용접 데이터가 모델에게 들어가기 전에 한 번 정리해 주는 라벨 정리반**입니다. 🧤
 
-> 📍 현재 버전은 **v0.1**입니다.<br>
+> 📍 현재 버전은 **v0.2**입니다.<br>
 > JSON 검증, 라벨 정규화와 CVAT Project 생성을 지원하며 Task 자동화와 dataset export는 준비 중입니다.
 
 ---
 
-## ✨ v0.1에서 할 수 있는 일
+## ✨ v0.2에서 할 수 있는 일
 
 | 기능 | 하는 일 |
 |---|---|
 | 🏷️ 라벨 정규화 | `기공`, `POROSITY`, `gas_pore`를 `porosity`로 통일 |
-| 📐 Polygon 검사 | x/y 좌표 개수, 최소 꼭짓점, 중복점과 이미지 경계 확인 |
+| 📐 Polygon 검사 | 좌표 구조, 면적, 자기교차, 중복점과 이미지 경계 확인 |
 | 🚨 오류 감지 | 올바르지 않은 annotation 항목을 즉시 알림 |
 | 🩻 검사 방식 확인 | 결함별 RT/VT modality 허용 여부 검증 |
 | 🖼️ 메타데이터 보존 | `image_id`, `filename`, `width`, `height` 유지 |
@@ -281,6 +281,7 @@ welding-annotation-qa/
 - [x] 6개 canonical 결함 taxonomy 정의
 - [x] RIAWELC JSON reader 구현
 - [x] Polygon 및 modality 기본 검증
+- [x] Polygon 면적 및 자기교차 검증
 - [x] 익명 fixture와 단위 테스트 구성
 - [x] CVAT REST API 연동
 - [x] CVAT Project 자동 생성

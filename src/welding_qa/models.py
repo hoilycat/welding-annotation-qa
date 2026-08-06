@@ -64,6 +64,23 @@ class Polygon:
                 f"Polygon repeats its first vertex at closing index {len(points) - 1}."
             )
 
+        # 좌표 크기를 정규화해 큰 값의 곱셈 overflow 없이 면적과 교차를 검사하는 코드
+        geometry_points = _normalize_geometry_points(points)
+        geometry_tolerance = _geometry_tolerance(geometry_points)
+        if _all_points_collinear(geometry_points, geometry_tolerance):
+            raise ParsingError("Polygon area is zero or too small.")
+        _validate_non_self_intersecting(geometry_points, geometry_tolerance)
+
+        # shoelace 공식의 부호는 방향만 나타내므로 절댓값으로 면적 0 여부를 확인하는 검사
+        signed_double_area = _shoelace_signed_double_area(geometry_points)
+        if math.isclose(
+            signed_double_area,
+            0.0,
+            rel_tol=0.0,
+            abs_tol=geometry_tolerance,
+        ):
+            raise ParsingError("Polygon area is zero or too small.")
+
     def validate_image_bounds(
         self,
         *,
@@ -118,6 +135,163 @@ def _normalize_image_dimension(field_name: str, value: Any) -> float:
     if not math.isfinite(normalized_value) or normalized_value <= 0:
         raise ParsingError(error_message)
     return normalized_value
+
+
+def _normalize_geometry_points(
+    points: tuple[tuple[float, float], ...],
+) -> tuple[tuple[float, float], ...]:
+    """좌표를 -1~1 범위로 축소해 기하 연산 overflow를 막는 함수."""
+    coordinate_scale = max(max(abs(x), abs(y)) for x, y in points)
+    if coordinate_scale == 0.0:
+        return points
+    return tuple((x / coordinate_scale, y / coordinate_scale) for x, y in points)
+
+
+def _geometry_tolerance(points: tuple[tuple[float, float], ...]) -> float:
+    """Polygon 범위에 비례하는 면적·orientation 비교 tolerance를 만드는 함수."""
+    xs, ys = zip(*points)
+    span = max(max(xs) - min(xs), max(ys) - min(ys))
+    return span * span * 1e-12
+
+
+def _shoelace_signed_double_area(
+    points: tuple[tuple[float, float], ...],
+) -> float:
+    """Shoelace 공식으로 방향 부호가 포함된 면적의 두 배를 계산하는 함수."""
+    # 첫 점을 원점으로 옮겨 큰 공통 offset에서 생기는 cancellation을 줄이는 코드
+    origin_x, origin_y = points[0]
+    translated = tuple((x - origin_x, y - origin_y) for x, y in points)
+    return math.fsum(
+        x1 * y2 - x2 * y1
+        for (x1, y1), (x2, y2) in zip(
+            translated,
+            translated[1:] + translated[:1],
+        )
+    )
+
+
+def _all_points_collinear(
+    points: tuple[tuple[float, float], ...],
+    tolerance: float,
+) -> bool:
+    """가장 멀리 떨어진 축의 두 점을 기준으로 모든 꼭짓점이 일직선인지 확인하는 함수."""
+    min_x_point = min(points, key=lambda point: point[0])
+    max_x_point = max(points, key=lambda point: point[0])
+    min_y_point = min(points, key=lambda point: point[1])
+    max_y_point = max(points, key=lambda point: point[1])
+    if max_x_point[0] - min_x_point[0] >= max_y_point[1] - min_y_point[1]:
+        baseline_start, baseline_end = min_x_point, max_x_point
+    else:
+        baseline_start, baseline_end = min_y_point, max_y_point
+
+    return all(
+        _orientation(baseline_start, baseline_end, point, tolerance) == 0
+        for point in points
+    )
+
+
+def _validate_non_self_intersecting(
+    points: tuple[tuple[float, float], ...],
+    tolerance: float,
+) -> None:
+    """서로 인접하지 않은 모든 변 쌍이 만나지 않는지 확인하는 함수."""
+    edge_count = len(points)
+    for first_index in range(edge_count):
+        first_start = points[first_index]
+        first_end = points[(first_index + 1) % edge_count]
+
+        for second_index in range(first_index + 1, edge_count):
+            # 연속 변과 첫 변·마지막 변은 정상적으로 한 꼭짓점을 공유하는 인접 변
+            if second_index == first_index + 1 or (
+                first_index == 0 and second_index == edge_count - 1
+            ):
+                continue
+
+            second_start = points[second_index]
+            second_end = points[(second_index + 1) % edge_count]
+            if _segments_intersect(
+                first_start,
+                first_end,
+                second_start,
+                second_end,
+                tolerance,
+            ):
+                raise ParsingError(
+                    "Polygon has self-intersection between non-adjacent edges "
+                    f"{first_index}-{(first_index + 1) % edge_count} and "
+                    f"{second_index}-{(second_index + 1) % edge_count}."
+                )
+
+
+def _segments_intersect(
+    first_start: tuple[float, float],
+    first_end: tuple[float, float],
+    second_start: tuple[float, float],
+    second_end: tuple[float, float],
+    tolerance: float,
+) -> bool:
+    """교차·끝점 접촉·일부 겹침을 모두 선분 교차로 판단하는 함수."""
+    orientations = (
+        _orientation(first_start, first_end, second_start, tolerance),
+        _orientation(first_start, first_end, second_end, tolerance),
+        _orientation(second_start, second_end, first_start, tolerance),
+        _orientation(second_start, second_end, first_end, tolerance),
+    )
+    first_to_second_start, first_to_second_end, second_to_first_start, second_to_first_end = (
+        orientations
+    )
+
+    if (
+        first_to_second_start * first_to_second_end < 0
+        and second_to_first_start * second_to_first_end < 0
+    ):
+        return True
+
+    return (
+        first_to_second_start == 0
+        and _point_on_segment(second_start, first_start, first_end, tolerance)
+        or first_to_second_end == 0
+        and _point_on_segment(second_end, first_start, first_end, tolerance)
+        or second_to_first_start == 0
+        and _point_on_segment(first_start, second_start, second_end, tolerance)
+        or second_to_first_end == 0
+        and _point_on_segment(first_end, second_start, second_end, tolerance)
+    )
+
+
+def _orientation(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    point: tuple[float, float],
+    tolerance: float,
+) -> int:
+    """세 점의 방향을 반시계 1, 시계 -1, 거의 일직선 0으로 분류하는 함수."""
+    cross_product = (
+        (end[0] - start[0]) * (point[1] - start[1])
+        - (end[1] - start[1]) * (point[0] - start[0])
+    )
+    if math.isclose(cross_product, 0.0, rel_tol=0.0, abs_tol=tolerance):
+        return 0
+    return 1 if cross_product > 0.0 else -1
+
+
+def _point_on_segment(
+    point: tuple[float, float],
+    start: tuple[float, float],
+    end: tuple[float, float],
+    tolerance: float,
+) -> bool:
+    """거의 일직선인 점이 선분의 bounding box 안에 있는지 확인하는 함수."""
+    # 면적 단위 tolerance를 같은 상대 정밀도의 좌표 단위 tolerance로 바꾸는 코드
+    linear_tolerance = math.sqrt(tolerance) * 1e-6
+    return (
+        min(start[0], end[0]) - linear_tolerance
+        <= point[0]
+        <= max(start[0], end[0]) + linear_tolerance
+        and min(start[1], end[1]) - linear_tolerance
+        <= point[1]
+        <= max(start[1], end[1]) + linear_tolerance
+    )
 
 
 @dataclass

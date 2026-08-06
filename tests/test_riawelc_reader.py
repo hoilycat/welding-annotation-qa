@@ -162,13 +162,13 @@ def test_parse_tuple_points_succeeds(taxonomy: TaxonomyConfig):
     defects = parse_riawelc_json(
         {
             "annotations": [
-                {"label": "porosity", "points": [(1, 1), (3, 3), (4, 4)]}
+                {"label": "porosity", "points": [(1, 1), (3, 1), (2, 4)]}
             ]
         },
         taxonomy,
     )
-    assert defects[0].polygon.x == (1.0, 3.0, 4.0)
-    assert defects[0].polygon.y == (1.0, 3.0, 4.0)
+    assert defects[0].polygon.x == (1.0, 3.0, 2.0)
+    assert defects[0].polygon.y == (1.0, 1.0, 4.0)
 
 
 @pytest.mark.parametrize("bad_coordinate", ["1", None, True])
