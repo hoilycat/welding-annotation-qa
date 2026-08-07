@@ -213,6 +213,27 @@ python -m welding_qa.cvat_task --modality RT --images data/rt-images
 python -m welding_qa.cvat_task --modality VT --images data/vt-images
 ```
 
+이미지와 같은 stem의 RIAWELC JSON을 함께 등록하거나 CVAT의 현재 polygon을 JSON으로
+내보낼 수 있습니다. 예를 들어 `001.png`는 `001.json`과 매칭됩니다. 이미지 또는 JSON의
+stem이 중복되면 잘못된 매칭과 덮어쓰기를 막기 위해 명령이 실패합니다.
+
+```bash
+python -m welding_qa.cvat_task --modality RT --images data/rt-images \
+  --annotations data/rt-annotations
+
+python -m welding_qa.cvat_task --modality RT --images data/rt-images \
+  --export-annotations exports/rt-annotations
+```
+
+기존 Task에 어노테이션이 있으면 작업자의 수정 내용을 보호하기 위해 업로드를 거부합니다.
+기존 내용을 모두 교체하려는 경우 먼저 내보내기로 백업한 다음 명시적으로 교체 옵션을
+사용합니다.
+
+```bash
+python -m welding_qa.cvat_task --modality RT --images data/rt-images \
+  --annotations data/rt-annotations --replace-annotations
+```
+
 Windows PowerShell에서는 `.env.cvat`을 현재 세션에 불러온 뒤 실행합니다.
 
 ```powershell
