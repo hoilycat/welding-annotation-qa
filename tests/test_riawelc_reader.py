@@ -82,6 +82,33 @@ def test_parse_actual_riawelc_schema(taxonomy: TaxonomyConfig):
     }
 
 
+def test_parse_actual_riawelc_slag_inclusion_label(taxonomy: TaxonomyConfig):
+    defects = parse_riawelc_json(
+        {
+            "info": {"id": 14520072, "type": "RT", "material": "ST"},
+            "image_data": {
+                "file_name": "RT_ST_05_14520072",
+                "format": "jpg",
+                "width": 1280,
+                "height": 720,
+            },
+            "annotations": [
+                {
+                    "coordinate": {
+                        "x": [748, 818, 821],
+                        "y": [360, 351, 377],
+                    },
+                    "case": "slag inclusion",
+                }
+            ],
+        },
+        taxonomy,
+        expected_modality="RT",
+    )
+
+    assert defects[0].label_canonical == "slag_inclusion"
+
+
 def test_parse_empty_annotations_returns_empty_list(taxonomy: TaxonomyConfig):
     assert parse_riawelc_json({"annotations": []}, taxonomy) == []
 
