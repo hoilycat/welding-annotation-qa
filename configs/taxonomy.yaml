@@ -18,6 +18,7 @@ canonical_classes:
     allowed_modalities: ["RT", "VT"]
     aliases:
       - "slag_inclusion"
+      - "slag inclusion"
       - "slag"
       - "슬래그"
       - "슬래그혼입"
