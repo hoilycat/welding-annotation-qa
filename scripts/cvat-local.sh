@@ -18,6 +18,7 @@ fi
 cvat_version="${CVAT_VERSION:-v2.71.0}"
 cvat_host="${CVAT_HOST:-localhost}"
 cvat_port="${CVAT_PORT:-8080}"
+cvat_url="${CVAT_URL:-http://$cvat_host:$cvat_port}"
 
 # 지원하는 하위 명령과 용도를 출력하는 도움말
 usage() {
@@ -102,8 +103,15 @@ case "$command" in
         compose ps
         ;;
     health)
-        require_docker
-        docker exec -t cvat_server python manage.py health_check
+        # API가 응답하면 Docker socket 권한이나 compose checkout 없이도 실제 서비스 상태를 확인
+        if curl --fail --silent --show-error --max-time 5 \
+            "$cvat_url/api/server/about" >/dev/null; then
+            echo "CVAT API is healthy: $cvat_url"
+        else
+            # API가 아직 뜨지 않은 경우에만 Docker 내부 health check로 원인을 확인
+            require_docker
+            docker exec -t cvat_server python manage.py health_check
+        fi
         ;;
     logs)
         require_docker

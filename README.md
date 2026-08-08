@@ -31,7 +31,11 @@
 쉽게 말하면, **용접 데이터가 모델에게 들어가기 전에 한 번 정리해 주는 라벨 정리반**입니다. 🧤
 
 > 📍 현재 버전은 **v0.3**입니다.<br>
-> JSON 검증, 라벨 정규화와 CVAT Project/Task 생성을 지원하며 annotation 동기화와 dataset export는 준비 중입니다.
+> JSON 검증, 라벨 정규화, CVAT Project/Task 생성과 annotation 동기화를 지원합니다.<br>
+> Canonical polygon export와 dataset QA 리포트를 제공하며 YOLO/COCO export는 다음 단계입니다.
+
+현재 테스트 스위트는 **125개**이며, 로컬 CVAT에서 이미지 업로드 → annotation 동기화 →
+canonical JSON export 전체 smoke test도 통과했습니다.
 
 ---
 
@@ -167,6 +171,30 @@ CVAT는 기본적으로 <http://localhost:8080>에서 열립니다. 최초 관�
 ./scripts/cvat-local.sh superuser
 ```
 
+`health`는 Docker 내부 명령보다 먼저 CVAT API(`/api/server/about`)를 확인하므로,
+Docker socket 권한이 제한된 환경에서도 실제 서비스가 응답하는지 판별할 수 있습니다.
+
+이미지 업로드부터 annotation 동기화와 canonical export까지 한 번에 확인하려면
+smoke test 스크립트를 사용할 수 있습니다. `--replace`는 기존 Task의 annotation을
+명시적으로 교체하므로 테스트 전용 Task에서만 사용합니다.
+
+```bash
+PYTHON=.venv/bin/python ./scripts/cvat-smoke.sh \
+  --images data/cvat-smoke-20260807 \
+  --annotations data/rt-annotations \
+  --export-dir reports/cvat-smoke \
+  --replace
+```
+
+JSON 폴더만 검사하는 dataset QA 리포트는 다음처럼 생성합니다.
+
+```bash
+python -m welding_qa.qa_report \
+  --annotations data/rt-annotations \
+  --modality RT \
+  --output reports/rt-qa.json
+```
+
 Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
 
 ```powershell
@@ -192,6 +220,16 @@ pip install -e ".[dev,cvat]"
 powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 status
 powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 down
 ```
+
+### 학교와 집에서 작업 이어가기
+
+이미지 원본과 `.env.cvat`는 Git에 넣지 않고 별도로 보관합니다. 다른 컴퓨터에서 작업할 때는
+같은 상대 경로로 이미지·RIAWELC JSON 폴더를 복원한 뒤 `.env.cvat`를 다시 설정합니다.
+
+- CVAT annotation을 계속 편집하려면 CVAT의 **native dataset export**로 전체 백업합니다.
+- 학습용 canonical polygon만 옮길 때는 `--export-annotations` 결과를 사용합니다.
+- canonical export는 tracks, tags, attributes와 같은 CVAT 전체 메타데이터 백업을 대신하지 않습니다.
+- `.env.cvat`에는 인증정보가 들어갈 수 있으므로 저장소에 커밋하지 않습니다.
 
 `.env.cvat`에 관리자 계정 또는 Personal Access Token을 설정하면 canonical taxonomy로
 RT/VT Polygon Project를 생성할 수 있습니다. 같은 이름과 label 구성을 가진
@@ -310,14 +348,20 @@ welding-annotation-qa/
 │   ├── riawelc_reader.py      # JSON 파싱과 검증
 │   ├── cvat_converter.py      # CVAT Polygon 양방향 변환
 │   ├── cvat_project.py        # CVAT Project 생성·재사용
-│   └── cvat_task.py           # CVAT Task 생성·이미지 업로드
+│   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
+│   └── qa_report.py            # annotation 폴더 QA 집계 리포트
 ├── tests/
 │   ├── fixtures/              # 익명 샘플 JSON
 │   ├── test_cvat_converter.py
 │   ├── test_cvat_project.py
 │   ├── test_cvat_task.py
+│   ├── test_qa_report.py
 │   ├── test_taxonomy.py
 │   └── test_riawelc_reader.py
+├── scripts/
+│   ├── cvat-local.sh         # macOS/Linux CVAT 환경 관리
+│   ├── cvat-local.ps1        # Windows CVAT 환경 관리
+│   └── cvat-smoke.sh         # 업로드·동기화·export 통합 검사
 └── docs/
     └── project-plan.md        # 다음 단계 로드맵
 ```
@@ -334,9 +378,10 @@ welding-annotation-qa/
 - [x] CVAT REST API 연동
 - [x] CVAT Project 자동 생성
 - [x] CVAT Task 자동 생성과 이미지 업로드
-- [ ] CVAT annotation 동기화
+- [x] CVAT annotation 동기화 및 canonical polygon export
 - [ ] YOLO/COCO export profile
-- [ ] QA 리포트와 validation dashboard
+- [x] 기본 annotation QA 리포트
+- [ ] Validation dashboard와 Release Manifest
 
 현재 구현하지 않은 상세 범위와 계획은 [`docs/project-plan.md`](docs/project-plan.md)에서 확인할 수 있습니다.
 

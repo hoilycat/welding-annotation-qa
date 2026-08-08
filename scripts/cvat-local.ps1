@@ -146,6 +146,7 @@ try {
     $script:CvatVersion = Get-CvatSetting -Name "CVAT_VERSION" -Default "v2.71.0"
     $script:CvatHost = Get-CvatSetting -Name "CVAT_HOST" -Default "localhost"
     $script:CvatPort = Get-CvatSetting -Name "CVAT_PORT" -Default "8080"
+    $script:CvatUrl = Get-CvatSetting -Name "CVAT_URL" -Default "http://$($script:CvatHost):$($script:CvatPort)"
     $defaultRuntimeDir = Join-Path $script:RepoRoot ".local\cvat"
     $script:RuntimeDir = [System.IO.Path]::GetFullPath(
         (Get-CvatSetting -Name "CVAT_RUNTIME_DIR" -Default $defaultRuntimeDir)
@@ -179,10 +180,21 @@ try {
             Invoke-CvatCompose -ArgumentList @("ps")
         }
         "health" {
-            Assert-DockerRunning
-            Invoke-NativeCommand -FilePath "docker" -ArgumentList @(
-                "exec", "-t", "cvat_server", "python", "manage.py", "health_check"
-            )
+            # API가 응답하면 Docker socket 권한이나 compose checkout 없이도 실제 서비스 상태를 확인
+            try {
+                $response = Invoke-WebRequest -Uri "$($script:CvatUrl)/api/server/about" -TimeoutSec 5
+                if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
+                    throw "CVAT API returned HTTP $($response.StatusCode)."
+                }
+                Write-Output "CVAT API is healthy: $($script:CvatUrl)"
+            }
+            catch {
+                # API가 아직 뜨지 않은 경우에만 Docker 내부 health check로 원인을 확인
+                Assert-DockerRunning
+                Invoke-NativeCommand -FilePath "docker" -ArgumentList @(
+                    "exec", "-t", "cvat_server", "python", "manage.py", "health_check"
+                )
+            }
         }
         "logs" {
             Assert-DockerRunning
