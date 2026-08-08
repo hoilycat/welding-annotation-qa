@@ -20,6 +20,10 @@ CVAT 기반 용접 어노테이션 데이터셋의 품질 검증, 표준 Taxonom
 - [x] Raw JSON ↔ CVAT Polygon 2-way 변환 서브시스템
 
 ### Phase 3: Automated QA & Validation Dashboard (Upcoming)
-- [ ] Bounding Box / Polygon 경계 이탈 및 레이블 충돌 자동 검수기
+- [ ] Annotation 간 레이블 충돌 및 중첩 자동 검수기
 - [ ] Duplicate Image Detection (Perceptual Hashing)
 - [ ] QA Validation Dashboard 및 Release Manifest 릴리스 연동
+
+이미지 경계와 Polygon 기하 유효성 검사는 Phase 1의 reader/model 검증에서
+지원합니다. Phase 3에서는 여러 annotation과 이미지 파일을 함께 비교하는
+dataset-level 검수로 범위를 확장합니다.

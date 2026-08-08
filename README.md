@@ -31,7 +31,8 @@
 쉽게 말하면, **용접 데이터가 모델에게 들어가기 전에 한 번 정리해 주는 라벨 정리반**입니다. 🧤
 
 > 📍 현재 버전은 **v0.3**입니다.<br>
-> JSON 검증, 라벨 정규화와 CVAT Project/Task 생성을 지원하며 annotation 동기화와 dataset export는 준비 중입니다.
+> JSON 검증, 라벨 정규화, CVAT Project/Task 생성과 annotation 동기화를 지원합니다.
+> Canonical polygon export를 제공하며 YOLO/COCO dataset export는 다음 단계입니다.
 
 ---
 
@@ -334,7 +335,7 @@ welding-annotation-qa/
 - [x] CVAT REST API 연동
 - [x] CVAT Project 자동 생성
 - [x] CVAT Task 자동 생성과 이미지 업로드
-- [ ] CVAT annotation 동기화
+- [x] CVAT annotation 동기화 및 canonical polygon export
 - [ ] YOLO/COCO export profile
 - [ ] QA 리포트와 validation dashboard
 
