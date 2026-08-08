@@ -177,12 +177,111 @@ def test_load_annotations_for_images(tmp_path: Path):
         '{"modality":"RT","annotations":[{"label":"porosity","polygon":{"x":[10,20,10],"y":[10,10,20]}}]}',
         encoding="utf-8",
     )
+    (ann_dir / "002.json").write_text(
+        '{"modality":"RT","annotations":[]}',
+        encoding="utf-8",
+    )
 
     result = load_annotations_for_images(ann_dir, img_paths, taxonomy, modality="RT")
     assert "001.png" in result
     assert len(result["001.png"]) == 1
     assert result["001.png"][0].label_canonical == "porosity"
     assert result["002.png"] == []
+
+
+def test_load_annotations_requires_json_for_every_image_by_default(tmp_path: Path):
+    from welding_qa.cvat_task import load_annotations_for_images
+    from welding_qa.taxonomy import TaxonomyConfig
+
+    taxonomy = TaxonomyConfig({
+        "canonical_classes": {
+            "porosity": {"aliases": [], "allowed_modalities": ["RT"]}
+        }
+    })
+    images = _make_images(tmp_path / "images", ["001.png", "002.png"])
+    annotation_dir = tmp_path / "annotations"
+    annotation_dir.mkdir()
+    (annotation_dir / "001.json").write_text(
+        '{"modality":"RT","annotations":[]}', encoding="utf-8"
+    )
+
+    with pytest.raises(ParsingError, match="missing annotation JSON files: 002.png"):
+        load_annotations_for_images(annotation_dir, images, taxonomy, modality="RT")
+
+    result = load_annotations_for_images(
+        annotation_dir,
+        images,
+        taxonomy,
+        modality="RT",
+        allow_missing=True,
+    )
+    assert result["002.png"] == []
+
+
+def test_load_annotations_rejects_json_without_matching_image(tmp_path: Path):
+    from welding_qa.cvat_task import load_annotations_for_images
+    from welding_qa.taxonomy import TaxonomyConfig
+
+    taxonomy = TaxonomyConfig({
+        "canonical_classes": {
+            "porosity": {"aliases": [], "allowed_modalities": ["RT"]}
+        }
+    })
+    images = _make_images(tmp_path / "images", ["001.png"])
+    annotation_dir = tmp_path / "annotations"
+    annotation_dir.mkdir()
+    (annotation_dir / "001.json").write_text(
+        '{"modality":"RT","annotations":[]}', encoding="utf-8"
+    )
+    (annotation_dir / "orphan.json").write_text(
+        '{"modality":"RT","annotations":[]}', encoding="utf-8"
+    )
+
+    with pytest.raises(ParsingError, match="no matching image: orphan.json"):
+        load_annotations_for_images(annotation_dir, images, taxonomy, modality="RT")
+
+
+def test_load_annotations_rejects_modality_mismatch(tmp_path: Path):
+    from welding_qa.cvat_task import load_annotations_for_images
+    from welding_qa.taxonomy import TaxonomyConfig
+
+    taxonomy = TaxonomyConfig({
+        "canonical_classes": {
+            "porosity": {"aliases": [], "allowed_modalities": ["RT", "VT"]}
+        }
+    })
+    images = _make_images(tmp_path / "images", ["001.png"])
+    annotation_dir = tmp_path / "annotations"
+    annotation_dir.mkdir()
+    (annotation_dir / "001.json").write_text(
+        '{"modality":"VT","annotations":[]}', encoding="utf-8"
+    )
+
+    with pytest.raises(ParsingError, match="does not match expected modality 'RT'"):
+        load_annotations_for_images(annotation_dir, images, taxonomy, modality="RT")
+
+
+def test_load_annotations_rejects_unknown_modality_before_matching(tmp_path: Path):
+    from welding_qa.cvat_task import load_annotations_for_images
+    from welding_qa.taxonomy import TaxonomyConfig
+
+    taxonomy = TaxonomyConfig({
+        "canonical_classes": {
+            "porosity": {"aliases": [], "allowed_modalities": ["RT"]}
+        }
+    })
+    images = _make_images(tmp_path / "images", ["001.png"])
+    annotation_dir = tmp_path / "annotations"
+    annotation_dir.mkdir()
+
+    with pytest.raises(ParsingError, match="modality 'INVALID' is not allowed"):
+        load_annotations_for_images(
+            annotation_dir,
+            images,
+            taxonomy,
+            modality="INVALID",
+            allow_missing=True,
+        )
 
 
 def test_load_annotations_rejects_ambiguous_image_stems(tmp_path: Path):
@@ -275,6 +374,26 @@ def test_sync_rejects_existing_annotations_without_explicit_replace():
     assert task.set_annotations_calls == 1
 
 
+@pytest.mark.parametrize(
+    "annotation_map",
+    [
+        {},
+        {"001.png": [], "unknown.png": []},
+    ],
+)
+def test_sync_rejects_annotation_map_that_does_not_match_frames(
+    annotation_map: dict[str, list[object]],
+):
+    from welding_qa.cvat_task import sync_task_annotations
+
+    project = FakeProject()
+    project.labels = []
+    task = FakeTask(1, "RT batch", ["001.png"])
+
+    with pytest.raises(ParsingError, match="does not match CVAT task frames"):
+        sync_task_annotations(task, project, annotation_map)  # type: ignore[arg-type]
+
+
 def test_export_rejects_frame_stem_collision():
     from welding_qa.cvat_task import export_task_annotations
     from welding_qa.taxonomy import TaxonomyConfig
@@ -288,6 +407,21 @@ def test_export_rejects_frame_stem_collision():
         export_task_annotations(task, project, taxonomy)
 
 
+@pytest.mark.parametrize("field", ["tracks", "tags"])
+def test_export_rejects_unsupported_annotation_types(field: str):
+    from welding_qa.cvat_task import export_task_annotations
+    from welding_qa.taxonomy import TaxonomyConfig
+
+    task = FakeTask(1, "RT batch", ["001.png"])
+    task.annotations[field] = [{"frame": 0}]
+    project = FakeProject()
+    project.labels = []
+    taxonomy = TaxonomyConfig({"canonical_classes": {}})
+
+    with pytest.raises(CvatIntegrationError, match=field):
+        export_task_annotations(task, project, taxonomy)
+
+
 def test_module_help_does_not_emit_runtime_warning():
     result = subprocess.run(
         [sys.executable, "-m", "welding_qa.cvat_task", "--help"],
@@ -298,3 +432,38 @@ def test_module_help_does_not_emit_runtime_warning():
 
     assert result.returncode == 0
     assert "RuntimeWarning" not in result.stderr
+
+
+def test_annotation_request_is_compatible_with_pinned_cvat_sdk():
+    pytest.importorskip("cvat_sdk")
+    from welding_qa.cvat_task import _build_annotation_request
+
+    sdk_task_type = type(
+        "SdkTaskTestDouble",
+        (),
+        {"__module__": "cvat_sdk.core.proxies.tasks"},
+    )
+    payload = {
+        "shapes": [
+            {
+                "type": "polygon",
+                "label_id": 1,
+                "frame": 0,
+                "points": [0.0, 0.0, 2.0, 0.0, 0.0, 2.0],
+                "occluded": False,
+                "outside": False,
+                "z_order": 0,
+                "rotation": 0.0,
+                "group": 0,
+                "source": "manual",
+                "attributes": [],
+            }
+        ],
+        "tracks": [],
+        "tags": [],
+    }
+
+    request = _build_annotation_request(sdk_task_type(), payload)
+    assert len(request.shapes) == 1
+    assert request.shapes[0].type.value == "polygon"
+    assert request.shapes[0].label_id == 1

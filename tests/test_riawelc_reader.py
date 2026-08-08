@@ -35,6 +35,53 @@ def test_parse_valid_fixture(taxonomy: TaxonomyConfig, sample_json_path: Path):
     }
 
 
+def test_parse_utf8_bom_file_succeeds(taxonomy: TaxonomyConfig, tmp_path: Path):
+    json_path = tmp_path / "bom.json"
+    json_path.write_text(
+        '{"modality":"RT","annotations":[]}',
+        encoding="utf-8-sig",
+    )
+    assert parse_riawelc_json(json_path, taxonomy) == []
+
+
+def test_parse_actual_riawelc_schema(taxonomy: TaxonomyConfig):
+    defects = parse_riawelc_json(
+        {
+            "info": {"id": 14487416, "type": "RT", "material": "AL"},
+            "image_data": {
+                "file_name": "RT_AL_01_14487416",
+                "format": "jpg",
+                "information": "균열",
+                "width": 1280,
+                "height": 720,
+            },
+            "annotations": [
+                {
+                    "tool": "polygon",
+                    "coordinate": {
+                        "x": [549, 533, 516, 551],
+                        "y": [282, 284, 293, 289],
+                    },
+                    "class": "defect",
+                    "case": "crack",
+                }
+            ],
+        },
+        taxonomy,
+        expected_modality="RT",
+    )
+
+    assert len(defects) == 1
+    assert defects[0].label_canonical == "crack"
+    assert defects[0].modality == "RT"
+    assert defects[0].extra_meta == {
+        "image_id": 14487416,
+        "filename": "RT_AL_01_14487416.jpg",
+        "width": 1280,
+        "height": 720,
+    }
+
+
 def test_parse_empty_annotations_returns_empty_list(taxonomy: TaxonomyConfig):
     assert parse_riawelc_json({"annotations": []}, taxonomy) == []
 
@@ -117,6 +164,47 @@ def test_parse_empty_modality_is_not_replaced_by_default(taxonomy: TaxonomyConfi
 def test_parse_whitespace_modality_is_not_accepted(taxonomy: TaxonomyConfig):
     with pytest.raises(ParsingError, match="Field 'modality' must not be empty"):
         parse_riawelc_json({"modality": "   ", "annotations": []}, taxonomy)
+
+
+def test_parse_invalid_modality_with_empty_annotations_raises_error(
+    taxonomy: TaxonomyConfig,
+):
+    with pytest.raises(ParsingError, match="modality 'INVALID' is not allowed"):
+        parse_riawelc_json({"modality": "INVALID", "annotations": []}, taxonomy)
+
+
+def test_parse_normalizes_modality(taxonomy: TaxonomyConfig):
+    defects = parse_riawelc_json(
+        {
+            "modality": " rt ",
+            "annotations": [
+                {"label": "porosity", "points": [[0, 0], [2, 0], [0, 2]]}
+            ],
+        },
+        taxonomy,
+    )
+    assert defects[0].modality == "RT"
+
+
+def test_parse_rejects_expected_modality_mismatch(taxonomy: TaxonomyConfig):
+    with pytest.raises(ParsingError, match="does not match expected modality 'RT'"):
+        parse_riawelc_json(
+            {"modality": "VT", "annotations": []},
+            taxonomy,
+            expected_modality="RT",
+        )
+
+
+@pytest.mark.parametrize("image_info", [None, [], "invalid"])
+def test_parse_rejects_non_object_image_info(
+    taxonomy: TaxonomyConfig,
+    image_info: object,
+):
+    with pytest.raises(ParsingError, match="Field 'image_info' must be a dictionary"):
+        parse_riawelc_json(
+            {"image_info": image_info, "annotations": []},
+            taxonomy,
+        )
 
 
 def test_parse_coordinate_mismatch_raises_error(taxonomy: TaxonomyConfig):

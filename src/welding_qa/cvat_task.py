@@ -136,6 +136,7 @@ def load_annotations_for_images(
     taxonomy: TaxonomyConfig,
     *,
     modality: str = "RT",
+    allow_missing: bool = False,
 ) -> dict[str, list[DefectAnnotation]]:
     """이미지 파일 목록과 매칭되는 JSON 어노테이션 파일들을 읽어 지도(dict)로 만드는 함수."""
     root = Path(annotation_root)
@@ -154,12 +155,48 @@ def load_annotations_for_images(
     )
     json_files = {path.stem.casefold(): path for path in json_candidates}
 
+    if not isinstance(modality, str) or not modality.strip():
+        raise ParsingError("Annotation modality must be a non-empty string.")
+    normalized_modality = modality.strip().upper()
+    if not taxonomy.is_known_modality(normalized_modality):
+        raise ParsingError(
+            f"Annotation modality '{normalized_modality}' is not allowed by canonical taxonomy."
+        )
+
+    image_stems = {path.stem.casefold() for path in image_paths}
+    unmatched_json_files = [
+        path.relative_to(root).as_posix()
+        for stem, path in json_files.items()
+        if stem not in image_stems
+    ]
+    if unmatched_json_files:
+        raise ParsingError(
+            "Annotation JSON files have no matching image: "
+            + ", ".join(unmatched_json_files)
+        )
+
+    missing_annotation_files = [
+        path.name for path in image_paths if path.stem.casefold() not in json_files
+    ]
+    if missing_annotation_files and not allow_missing:
+        raise ParsingError(
+            "Images are missing annotation JSON files: "
+            + ", ".join(missing_annotation_files)
+            + ". Add explicit JSON with annotations: [] for clean images, or use "
+            "--allow-missing-annotations."
+        )
+
     annotation_map: dict[str, list[DefectAnnotation]] = {}
     for img_path in image_paths:
         stem_key = img_path.stem.casefold()
         json_path = json_files.get(stem_key)
         if json_path and json_path.is_file():
-            annotations = parse_riawelc_json(json_path, taxonomy, default_modality=modality)
+            annotations = parse_riawelc_json(
+                json_path,
+                taxonomy,
+                default_modality=normalized_modality,
+                expected_modality=normalized_modality,
+            )
             annotation_map[img_path.name] = annotations
         else:
             annotation_map[img_path.name] = []
@@ -178,11 +215,22 @@ def sync_task_annotations(
     canonical_to_id, _ = build_label_id_mappings(project)
     get_frames_fn = getattr(task, "get_frames_info", None)
     frames_info = get_frames_fn() if callable(get_frames_fn) else (_field(task, "frames") or [])
+    frame_names = [Path(str(_field(frame, "name"))).name for frame in frames_info]
+    expected_frame_names = set(frame_names)
+    provided_frame_names = set(annotation_map)
+    if expected_frame_names != provided_frame_names:
+        missing = sorted(expected_frame_names - provided_frame_names)
+        unexpected = sorted(provided_frame_names - expected_frame_names)
+        details = []
+        if missing:
+            details.append("missing frames: " + ", ".join(missing))
+        if unexpected:
+            details.append("unknown frames: " + ", ".join(unexpected))
+        raise ParsingError("Annotation map does not match CVAT task frames (" + "; ".join(details) + ").")
 
     all_shapes: list[dict[str, Any]] = []
-    for frame_idx, frame in enumerate(frames_info):
-        frame_name = Path(str(_field(frame, "name"))).name
-        annotations = annotation_map.get(frame_name) or []
+    for frame_idx, frame_name in enumerate(frame_names):
+        annotations = annotation_map[frame_name]
         if annotations:
             shapes = annotations_to_cvat_shapes(annotations, canonical_to_id, frame=frame_idx)
             all_shapes.extend(shapes)
@@ -190,8 +238,8 @@ def sync_task_annotations(
     existing_payload = _get_task_annotations(task)
     if any(existing_payload.get(field) for field in ("shapes", "tracks", "tags")) and not replace_existing:
         raise CvatIntegrationError(
-            "CVAT task already has annotations. Export them first or rerun with "
-            "--replace-annotations to replace them explicitly."
+            "CVAT task already has annotations. Create a native CVAT dataset backup first, "
+            "then rerun with --replace-annotations to replace them explicitly."
         )
 
     payload = {"shapes": all_shapes, "tracks": [], "tags": []}
@@ -221,6 +269,15 @@ def export_task_annotations(
     frames_info = get_frames_fn() if callable(get_frames_fn) else (_field(task, "frames") or [])
 
     annotation_payload = _get_task_annotations(task)
+    unsupported_fields = [
+        field for field in ("tracks", "tags") if annotation_payload[field]
+    ]
+    if unsupported_fields:
+        raise CvatIntegrationError(
+            "Canonical polygon export cannot preserve CVAT "
+            + " and ".join(unsupported_fields)
+            + ". Use CVAT's native dataset export for a complete backup."
+        )
     shapes = annotation_payload["shapes"]
 
     shapes_by_frame: dict[int, list[dict[str, Any]]] = {}
@@ -351,6 +408,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--modality", required=True, help="Task modality, such as RT or VT")
     parser.add_argument("--images", required=True, type=Path, help="Image directory to upload")
     parser.add_argument("--annotations", type=Path, help="Directory containing JSON annotations to upload")
+    parser.add_argument(
+        "--allow-missing-annotations",
+        action="store_true",
+        help="Treat images without matching JSON files as empty annotations",
+    )
     parser.add_argument("--export-annotations", type=Path, help="Directory to save exported CVAT annotations")
     parser.add_argument(
         "--replace-annotations",
@@ -374,6 +436,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.replace_annotations and not args.annotations:
         parser.error("--replace-annotations requires --annotations")
+    if args.allow_missing_annotations and not args.annotations:
+        parser.error("--allow-missing-annotations requires --annotations")
     modality = args.modality.strip().upper()
     project_name = args.project_name or f"Welding QA {modality}"
     task_name = args.task_name or f"{project_name} - {args.images.name}"
@@ -382,6 +446,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         # taxonomy와 이미지 입력을 먼저 검증한 다음 인증된 SDK client를 생성
         taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
         image_paths = collect_image_paths(args.images)
+        annotation_map = None
+        if args.annotations:
+            annotation_map = load_annotations_for_images(
+                args.annotations,
+                image_paths,
+                taxonomy,
+                modality=modality,
+                allow_missing=args.allow_missing_annotations,
+            )
         settings = CvatSettings.from_environ()
         client = connect_cvat(settings)
         synced_shapes_count = 0
@@ -401,14 +474,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 image_paths,
             )
 
-            if args.annotations:
-                ann_map = load_annotations_for_images(
-                    args.annotations, image_paths, taxonomy, modality=modality
-                )
+            if annotation_map is not None:
                 synced_shapes_count = sync_task_annotations(
                     task,
                     project,
-                    ann_map,
+                    annotation_map,
                     replace_existing=args.replace_annotations,
                 )
 
