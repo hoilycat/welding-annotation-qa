@@ -168,6 +168,27 @@ CVAT는 기본적으로 <http://localhost:8080>에서 열립니다. 최초 관�
 ./scripts/cvat-local.sh superuser
 ```
 
+이미지 업로드부터 annotation 동기화와 canonical export까지 한 번에 확인하려면
+smoke test 스크립트를 사용할 수 있습니다. `--replace`는 기존 Task의 annotation을
+명시적으로 교체하므로 테스트 전용 Task에서만 사용합니다.
+
+```bash
+PYTHON=.venv/bin/python ./scripts/cvat-smoke.sh \
+  --images data/cvat-smoke-20260807 \
+  --annotations data/rt-annotations \
+  --export-dir reports/cvat-smoke \
+  --replace
+```
+
+JSON 폴더만 검사하는 dataset QA 리포트는 다음처럼 생성합니다.
+
+```bash
+python -m welding_qa.qa_report \
+  --annotations data/rt-annotations \
+  --modality RT \
+  --output reports/rt-qa.json
+```
+
 Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
 
 ```powershell
@@ -311,7 +332,8 @@ welding-annotation-qa/
 │   ├── riawelc_reader.py      # JSON 파싱과 검증
 │   ├── cvat_converter.py      # CVAT Polygon 양방향 변환
 │   ├── cvat_project.py        # CVAT Project 생성·재사용
-│   └── cvat_task.py           # CVAT Task 생성·이미지 업로드
+│   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
+│   └── qa_report.py            # annotation 폴더 QA 집계 리포트
 ├── tests/
 │   ├── fixtures/              # 익명 샘플 JSON
 │   ├── test_cvat_converter.py
@@ -337,7 +359,8 @@ welding-annotation-qa/
 - [x] CVAT Task 자동 생성과 이미지 업로드
 - [x] CVAT annotation 동기화 및 canonical polygon export
 - [ ] YOLO/COCO export profile
-- [ ] QA 리포트와 validation dashboard
+- [x] 기본 annotation QA 리포트
+- [ ] Validation dashboard와 Release Manifest
 
 현재 구현하지 않은 상세 범위와 계획은 [`docs/project-plan.md`](docs/project-plan.md)에서 확인할 수 있습니다.
 
