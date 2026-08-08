@@ -59,3 +59,7 @@ jobs:
           if ($output.Trim() -ne "http://localhost:8080") {
               throw "Unexpected CVAT URL: $output"
           }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cvat-smoke.ps1 -Help
+          if ($LASTEXITCODE -ne 0) {
+              throw "cvat-smoke.ps1 -Help exited with code $LASTEXITCODE"
+          }

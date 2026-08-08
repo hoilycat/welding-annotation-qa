@@ -186,6 +186,16 @@ PYTHON=.venv/bin/python ./scripts/cvat-smoke.sh \
   --replace
 ```
 
+Windows PowerShell에서는 같은 검사를 다음처럼 실행합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\cvat-smoke.ps1 `
+  -Images data\cvat-smoke-20260807 `
+  -Annotations data\rt-annotations `
+  -ExportDir reports\cvat-smoke `
+  -Replace
+```
+
 JSON 폴더만 검사하는 dataset QA 리포트는 다음처럼 생성합니다.
 
 ```bash
@@ -361,7 +371,8 @@ welding-annotation-qa/
 ├── scripts/
 │   ├── cvat-local.sh         # macOS/Linux CVAT 환경 관리
 │   ├── cvat-local.ps1        # Windows CVAT 환경 관리
-│   └── cvat-smoke.sh         # 업로드·동기화·export 통합 검사
+│   ├── cvat-smoke.sh         # macOS/Linux 업로드·동기화·export 통합 검사
+│   └── cvat-smoke.ps1        # Windows 업로드·동기화·export 통합 검사
 └── docs/
     └── project-plan.md        # 다음 단계 로드맵
 ```
