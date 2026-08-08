@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from welding_qa.models import ParsingError
 from welding_qa.taxonomy import TaxonomyConfig
 
 
@@ -35,3 +36,40 @@ def test_unknown_label_raises_error(taxonomy_yaml_path: Path):
     taxonomy = TaxonomyConfig.load_from_yaml(taxonomy_yaml_path)
     with pytest.raises(ValueError, match="Unknown label"):
         taxonomy.get_canonical_slug("non_existent_defect_label_xyz")
+
+
+def test_taxonomy_rejects_alias_collision_with_canonical_slug():
+    with pytest.raises(ParsingError, match="alias 'porosity' is ambiguous"):
+        TaxonomyConfig(
+            {
+                "canonical_classes": {
+                    "porosity": {"aliases": [], "allowed_modalities": ["RT"]},
+                    "crack": {
+                        "aliases": ["porosity"],
+                        "allowed_modalities": ["RT"],
+                    },
+                }
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"canonical_classes": []},
+        {"canonical_classes": {"porosity": []}},
+        {
+            "canonical_classes": {
+                "porosity": {"aliases": "gas_pore", "allowed_modalities": ["RT"]}
+            }
+        },
+        {
+            "canonical_classes": {
+                "porosity": {"aliases": [], "allowed_modalities": "RT"}
+            }
+        },
+    ],
+)
+def test_taxonomy_rejects_invalid_schema(config: dict[str, object]):
+    with pytest.raises(ParsingError, match="Taxonomy"):
+        TaxonomyConfig(config)  # type: ignore[arg-type]

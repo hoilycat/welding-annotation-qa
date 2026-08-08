@@ -216,7 +216,9 @@ python -m welding_qa.cvat_task --modality VT --images data/vt-images
 
 이미지와 같은 stem의 RIAWELC JSON을 함께 등록하거나 CVAT의 현재 polygon을 JSON으로
 내보낼 수 있습니다. 예를 들어 `001.png`는 `001.json`과 매칭됩니다. 이미지 또는 JSON의
-stem이 중복되면 잘못된 매칭과 덮어쓰기를 막기 위해 명령이 실패합니다.
+stem이 중복되거나, 이미지와 JSON이 서로 대응하지 않거나, JSON의 modality가 Task와
+다르면 잘못된 매칭을 막기 위해 명령이 실패합니다. 결함이 없는 이미지도
+`annotations: []`를 가진 JSON을 명시적으로 준비합니다.
 
 ```bash
 python -m welding_qa.cvat_task --modality RT --images data/rt-images \
@@ -226,9 +228,19 @@ python -m welding_qa.cvat_task --modality RT --images data/rt-images \
   --export-annotations exports/rt-annotations
 ```
 
+부분 annotation 세트를 의도적으로 올리는 경우에만 JSON이 없는 이미지를 빈 annotation으로
+처리하는 옵션을 사용합니다. 이미지와 매칭되지 않는 JSON은 이 옵션으로도 허용하지 않습니다.
+
+```bash
+python -m welding_qa.cvat_task --modality RT --images data/rt-images \
+  --annotations data/rt-annotations --allow-missing-annotations
+```
+
 기존 Task에 어노테이션이 있으면 작업자의 수정 내용을 보호하기 위해 업로드를 거부합니다.
-기존 내용을 모두 교체하려는 경우 먼저 내보내기로 백업한 다음 명시적으로 교체 옵션을
-사용합니다.
+`--export-annotations`는 모델 학습용 canonical polygon 내보내기이며 CVAT 전체 백업이
+아닙니다. tracks, tags, attributes까지 보존하려면 CVAT의 native dataset export로 먼저
+백업한 다음 명시적으로 교체 옵션을 사용합니다. tracks나 tags가 있는 Task의 canonical
+export는 데이터 누락을 막기 위해 실패합니다.
 
 ```bash
 python -m welding_qa.cvat_task --modality RT --images data/rt-images \

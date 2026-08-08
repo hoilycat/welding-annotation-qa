@@ -14,6 +14,8 @@ def parse_riawelc_json(
     json_path_or_content: str | Path | dict[str, Any],
     taxonomy: TaxonomyConfig,
     default_modality: str = "RT",
+    *,
+    expected_modality: str | None = None,
 ) -> list[DefectAnnotation]:
     """파일 경로, JSON 문자열, dictionary 입력을 검증된 annotation 목록으로 바꾸는 함수."""
     # 문자열이 실제 파일 경로인지 먼저 확인하고 아니면 JSON 본문으로 처리하는 입력 분기
@@ -22,7 +24,8 @@ def parse_riawelc_json(
     ):
         path = Path(json_path_or_content)
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            # Windows 도구가 추가하는 UTF-8 BOM도 투명하게 제거해 JSON을 읽는다.
+            with open(path, "r", encoding="utf-8-sig") as f:
                 data = json.load(f)
         except json.JSONDecodeError as exc:
             raise ParsingError(f"Invalid JSON in file '{path}': {exc.msg}") from exc
@@ -51,19 +54,55 @@ def parse_riawelc_json(
     if not isinstance(annotations_list, list):
         raise ParsingError(f"Field '{annotations_field}' must be a list.")
 
-    # modality가 명시된 경우 빈 값으로 default를 덮어쓰지 못하게 직접 존재 여부를 확인하는 코드
-    modality = data["modality"] if "modality" in data else default_modality
+    source_info = data.get("info", {})
+    if not isinstance(source_info, dict):
+        raise ParsingError("Field 'info' must be a dictionary object.")
+
+    # 정규화 스키마의 modality와 실제 RIAWELC info.type을 모두 지원한다.
+    modality = data.get("modality", source_info.get("type", default_modality))
     if not isinstance(modality, str):
         raise ParsingError("Field 'modality' must be a string.")
     if not modality.strip():
         raise ParsingError("Field 'modality' must not be empty.")
+    modality = modality.strip().upper()
+    if not taxonomy.is_known_modality(modality):
+        raise ParsingError(
+            f"Field modality '{modality}' is not allowed by canonical taxonomy."
+        )
 
-    # 중첩 image_info를 우선하되 구형 최상위 이미지 메타데이터도 계속 지원
-    image_info = data.get("image_info")
+    if expected_modality is not None:
+        if not isinstance(expected_modality, str) or not expected_modality.strip():
+            raise ParsingError("Expected modality must be a non-empty string.")
+        normalized_expected_modality = expected_modality.strip().upper()
+        if modality != normalized_expected_modality:
+            raise ParsingError(
+                f"JSON modality '{modality}' does not match expected modality "
+                f"'{normalized_expected_modality}'."
+            )
+
+    source_image_data = data.get("image_data", {})
+    if not isinstance(source_image_data, dict):
+        raise ParsingError("Field 'image_data' must be a dictionary object.")
+
+    # 정규화 image_info를 우선하되 실제 RIAWELC image_data와 구형 최상위 필드도 지원한다.
+    image_info = data.get("image_info", {})
     if not isinstance(image_info, dict):
-        image_info = {}
-    image_width = image_info.get("width", data.get("width"))
-    image_height = image_info.get("height", data.get("height"))
+        raise ParsingError("Field 'image_info' must be a dictionary object.")
+    image_width = image_info.get(
+        "width", source_image_data.get("width", data.get("width"))
+    )
+    image_height = image_info.get(
+        "height", source_image_data.get("height", data.get("height"))
+    )
+    image_filename = image_info.get("filename", data.get("filename"))
+    if image_filename is None and source_image_data.get("file_name"):
+        image_filename = str(source_image_data["file_name"])
+        image_format = source_image_data.get("format")
+        if image_format and not Path(image_filename).suffix:
+            image_filename = f"{image_filename}.{str(image_format).lstrip('.')}"
+    image_id = image_info.get(
+        "image_id", data.get("image_id", source_info.get("id"))
+    )
     # annotation이 0개여도 잘못된 이미지 크기를 놓치지 않게 반복문 전에 실행하는 검사
     validate_image_dimensions(width=image_width, height=image_height)
 
@@ -74,7 +113,12 @@ def parse_riawelc_json(
         if not isinstance(item, dict):
             raise ParsingError(f"Annotation item at index {idx} must be a dictionary object.")
 
-        raw_label = item.get("label") or item.get("class_name") or item.get("defect_type")
+        raw_label = (
+            item.get("label")
+            or item.get("class_name")
+            or item.get("defect_type")
+            or item.get("case")
+        )
         if not raw_label:
             raise ParsingError(f"Annotation item at index {idx} missing label field.")
 
@@ -94,6 +138,8 @@ def parse_riawelc_json(
         # polygon.x/y, points[[x,y]], 항목 직속 x/y 형식을 모두 받는 호환 처리
         if "polygon" in item:
             poly_data = item["polygon"]
+        elif "coordinate" in item:
+            poly_data = item["coordinate"]
         elif "points" in item:
             poly_data = item["points"]
         else:
@@ -147,8 +193,8 @@ def parse_riawelc_json(
                 polygon=polygon,
                 modality=modality,
                 extra_meta={
-                    "image_id": image_info.get("image_id", data.get("image_id")),
-                    "filename": image_info.get("filename", data.get("filename")),
+                    "image_id": image_id,
+                    "filename": image_filename,
                     "width": image_width,
                     "height": image_height,
                 },

@@ -122,6 +122,11 @@ def cvat_shape_to_annotation(
         raise ParsingError("CVAT annotation modality must be a string.")
     if not modality.strip():
         raise ParsingError("CVAT annotation modality must not be empty.")
+    normalized_modality = modality.strip().upper()
+    if not taxonomy.is_known_modality(normalized_modality):
+        raise ParsingError(
+            f"CVAT annotation modality '{normalized_modality}' is not allowed by canonical taxonomy."
+        )
 
     # CVAT의 숫자 label ID를 Project에서 조회한 사람이 읽는 label 이름으로 복원
     raw_label = label_names[label_id]
@@ -133,9 +138,9 @@ def cvat_shape_to_annotation(
         canonical_slug = taxonomy.get_canonical_slug(raw_label)
     except ValueError as exc:
         raise ParsingError(f"CVAT label ID '{label_id}' has invalid label: {exc}") from exc
-    if not taxonomy.is_modality_allowed(canonical_slug, modality):
+    if not taxonomy.is_modality_allowed(canonical_slug, normalized_modality):
         raise ParsingError(
-            f"Modality '{modality}' is not allowed for canonical label "
+            f"Modality '{normalized_modality}' is not allowed for canonical label "
             f"'{canonical_slug}'."
         )
 
@@ -168,7 +173,7 @@ def cvat_shape_to_annotation(
         label_original=raw_label,
         label_canonical=canonical_slug,
         polygon=polygon,
-        modality=modality,
+        modality=normalized_modality,
         extra_meta={"cvat": cvat_meta},
     )
 

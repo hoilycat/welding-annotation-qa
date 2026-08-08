@@ -130,6 +130,21 @@ def test_cvat_round_trip_preserves_core_annotation_fields(
     assert restored.modality == annotation.modality
 
 
+def test_cvat_shape_to_annotation_normalizes_modality(taxonomy: TaxonomyConfig):
+    annotation = cvat_shape_to_annotation(
+        {
+            "type": "polygon",
+            "frame": 0,
+            "label_id": 7,
+            "points": [0, 0, 2, 0, 0, 2],
+        },
+        {7: "porosity"},
+        taxonomy,
+        modality=" rt ",
+    )
+    assert annotation.modality == "RT"
+
+
 @pytest.mark.parametrize(
     ("points", "message"),
     [
