@@ -13,10 +13,10 @@ CVAT 기반 용접 어노테이션 데이터셋의 품질 검증, 표준 Taxonom
 - [x] Raw RIAWELC JSON Reader 스키마 파서 및 x/y 좌표 검증기 구현
 - [x] 익명화 샘플 Fixture 및 Pytest 단위 테스트 스위트 구축
 
-### Phase 2: CVAT Integration & Task Curation (Current Milestone)
+### Phase 2: CVAT Integration & Task Curation (Complete)
 - [x] CVAT REST API SDK 연동 모듈 개발
 - [x] Canonical taxonomy 기반 Project 자동 등록
-- [ ] Task 자동 등록 및 어노테이션 동기화 파이프라인
+- [x] Task 자동 등록 및 어노테이션 동기화 파이프라인
 - [x] Raw JSON ↔ CVAT Polygon 2-way 변환 서브시스템
 
 ### Phase 3: Automated QA & Validation Dashboard (Upcoming)
