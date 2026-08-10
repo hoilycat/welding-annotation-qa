@@ -84,6 +84,7 @@ def build_qa_report(
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Annotation 폴더 QA 리포트 CLI의 명령행 인자를 구성한다."""
     parser = argparse.ArgumentParser(
         description="Validate a RIAWELC annotation directory and write a QA report."
     )
@@ -99,6 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """입력 폴더를 검증하고 JSON 리포트를 기록하는 CLI 진입점."""
     args = _build_parser().parse_args(argv)
     try:
         taxonomy = (
