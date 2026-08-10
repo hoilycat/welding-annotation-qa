@@ -24,3 +24,6 @@ dev = [
 minversion = "7.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.setuptools.package-data]
+welding_qa = ["resources/*.yaml"]

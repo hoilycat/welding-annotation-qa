@@ -1,0 +1,60 @@
+version: "1.0"
+policy:
+  fixed_numeric_id_in_canonical: false
+  note: "Numeric class IDs are assigned dynamically in export profiles, not fixed in canonical taxonomy."
+
+canonical_classes:
+  porosity:
+    korean_name: "기공"
+    allowed_modalities: ["RT", "VT"]
+    aliases:
+      - "porosity"
+      - "기공"
+      - "gas_pore"
+      - "blowhole"
+
+  slag_inclusion:
+    korean_name: "슬래그 혼입"
+    allowed_modalities: ["RT", "VT"]
+    aliases:
+      - "slag_inclusion"
+      - "slag inclusion"
+      - "slag"
+      - "슬래그"
+      - "슬래그혼입"
+      - "슬래그 혼입"
+
+  crack:
+    korean_name: "균열"
+    allowed_modalities: ["RT", "VT"]
+    aliases:
+      - "crack"
+      - "균열"
+      - "크랙"
+
+  lack_of_fusion:
+    korean_name: "융합 불량"
+    allowed_modalities: ["RT", "VT"]
+    aliases:
+      - "lack_of_fusion"
+      - "lack of fusion"
+      - "융합불량"
+      - "융합 불량"
+      - "lof"
+
+  incomplete_penetration:
+    korean_name: "용입 부족"
+    allowed_modalities: ["RT", "VT"]
+    aliases:
+      - "incomplete_penetration"
+      - "incomplete penetration"
+      - "용입부족"
+      - "용입 부족"
+      - "ip"
+
+  undercut:
+    korean_name: "언더컷"
+    allowed_modalities: ["RT", "VT"]
+    aliases:
+      - "undercut"
+      - "언더컷"

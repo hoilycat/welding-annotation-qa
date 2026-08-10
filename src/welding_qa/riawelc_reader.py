@@ -119,7 +119,22 @@ def parse_riawelc_json(
             or item.get("defect_type")
             or item.get("case")
         )
-        if not raw_label:
+        raw_class = item.get("class")
+        normalized_class = (
+            raw_class.strip().casefold() if isinstance(raw_class, str) else None
+        )
+        has_label = raw_label is not None and bool(str(raw_label).strip())
+
+        # 실제 RIAWELC의 normal polygon은 결함이 아니라 정상 용접 영역 표시이므로 제외한다.
+        # normal과 defect가 한 파일에 함께 있어도 defect polygon은 계속 파싱한다.
+        if normalized_class == "normal":
+            if has_label:
+                raise ParsingError(
+                    f"Annotation item at index {idx} is class 'normal' but defines "
+                    f"defect label '{raw_label}'."
+                )
+            continue
+        if not has_label:
             raise ParsingError(f"Annotation item at index {idx} missing label field.")
 
         # 원본 라벨을 taxonomy의 canonical slug로 통일하고 modality 정책까지 확인하는 코드

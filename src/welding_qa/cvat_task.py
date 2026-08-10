@@ -424,8 +424,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--taxonomy",
         type=Path,
-        default=Path("configs/taxonomy.yaml"),
-        help="Path to the canonical taxonomy YAML",
+        help="Path to a custom taxonomy YAML (defaults to packaged canonical taxonomy)",
     )
     return parser
 
@@ -444,7 +443,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         # taxonomy와 이미지 입력을 먼저 검증한 다음 인증된 SDK client를 생성
-        taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
+        taxonomy = (
+            TaxonomyConfig.load_from_yaml(args.taxonomy)
+            if args.taxonomy
+            else TaxonomyConfig.load_default()
+        )
         image_paths = collect_image_paths(args.images)
         annotation_map = None
         if args.annotations:

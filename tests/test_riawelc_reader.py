@@ -109,6 +109,105 @@ def test_parse_actual_riawelc_slag_inclusion_label(taxonomy: TaxonomyConfig):
     assert defects[0].label_canonical == "slag_inclusion"
 
 
+def test_parse_actual_riawelc_normal_polygon_as_empty_annotation(
+    taxonomy: TaxonomyConfig,
+):
+    defects = parse_riawelc_json(
+        {
+            "info": {"type": "RT"},
+            "image_data": {"width": 1280, "height": 720},
+            "annotations": [
+                {
+                    "tool": "polygon",
+                    "coordinate": {
+                        "x": [-8, 1283, 1283, 1290, -4],
+                        "y": [-7, -8, 12, 715, 714],
+                    },
+                    "class": "normal",
+                    "case": "",
+                }
+            ],
+        },
+        taxonomy,
+        expected_modality="RT",
+    )
+
+    assert defects == []
+
+
+def test_parse_actual_riawelc_mixed_normal_and_defect_annotations(
+    taxonomy: TaxonomyConfig,
+):
+    defects = parse_riawelc_json(
+        {
+            "info": {"type": "RT"},
+            "image_data": {"width": 1280, "height": 720},
+            "annotations": [
+                {
+                    "coordinate": {
+                        "x": [-8, 1283, 1283, 1290, -4],
+                        "y": [-7, -8, 12, 715, 714],
+                    },
+                    "class": "normal",
+                    "case": "",
+                },
+                {
+                    "coordinate": {
+                        "x": [399, 417, 402],
+                        "y": [384, 361, 397],
+                    },
+                    "class": "defect",
+                    "case": "porosity",
+                },
+            ],
+        },
+        taxonomy,
+    )
+
+    assert [defect.label_canonical for defect in defects] == ["porosity"]
+
+
+def test_parse_actual_riawelc_defect_without_case_stays_invalid(
+    taxonomy: TaxonomyConfig,
+):
+    with pytest.raises(ParsingError, match="missing label field"):
+        parse_riawelc_json(
+            {
+                "info": {"type": "VT"},
+                "image_data": {"width": 1280, "height": 720},
+                "annotations": [
+                    {
+                        "coordinate": {
+                            "x": [556, 557, 568, 563],
+                            "y": [426, 423, 431, 434],
+                        },
+                        "class": "defect",
+                        "case": "",
+                    }
+                ],
+            },
+            taxonomy,
+        )
+
+
+def test_parse_rejects_normal_annotation_with_defect_label(
+    taxonomy: TaxonomyConfig,
+):
+    with pytest.raises(ParsingError, match="class 'normal'.*defect label"):
+        parse_riawelc_json(
+            {
+                "annotations": [
+                    {
+                        "coordinate": {"x": [0, 2, 0], "y": [0, 0, 2]},
+                        "class": "normal",
+                        "case": "porosity",
+                    }
+                ]
+            },
+            taxonomy,
+        )
+
+
 def test_parse_empty_annotations_returns_empty_list(taxonomy: TaxonomyConfig):
     assert parse_riawelc_json({"annotations": []}, taxonomy) == []
 

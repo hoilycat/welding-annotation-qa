@@ -91,3 +91,30 @@ def test_qa_report_cli_returns_failure_but_writes_invalid_report(
 
     assert exit_code == 1
     assert json.loads(output_path.read_text(encoding="utf-8"))["files_invalid"] == 1
+
+
+def test_qa_report_cli_uses_packaged_taxonomy_outside_repository(
+    tmp_path: Path,
+    monkeypatch,
+):
+    annotation_dir = tmp_path / "annotations"
+    annotation_dir.mkdir()
+    _write_annotation(annotation_dir / "001.json")
+    output_path = tmp_path / "report.json"
+    working_dir = tmp_path / "outside-repository"
+    working_dir.mkdir()
+    monkeypatch.chdir(working_dir)
+
+    exit_code = main(
+        [
+            "--annotations",
+            str(annotation_dir),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert json.loads(output_path.read_text(encoding="utf-8"))["label_counts"] == {
+        "porosity": 1
+    }

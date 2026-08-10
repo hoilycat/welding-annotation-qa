@@ -88,7 +88,11 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Validate a RIAWELC annotation directory and write a QA report."
     )
     parser.add_argument("--annotations", required=True, type=Path)
-    parser.add_argument("--taxonomy", type=Path, default=Path("configs/taxonomy.yaml"))
+    parser.add_argument(
+        "--taxonomy",
+        type=Path,
+        help="Path to a custom taxonomy YAML (defaults to packaged canonical taxonomy)",
+    )
     parser.add_argument("--modality", help="Require every JSON file to use this modality")
     parser.add_argument("--output", required=True, type=Path)
     return parser
@@ -97,7 +101,11 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
+        taxonomy = (
+            TaxonomyConfig.load_from_yaml(args.taxonomy)
+            if args.taxonomy
+            else TaxonomyConfig.load_default()
+        )
         report = build_qa_report(args.annotations, taxonomy, modality=args.modality)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -38,6 +38,15 @@ def test_unknown_label_raises_error(taxonomy_yaml_path: Path):
         taxonomy.get_canonical_slug("non_existent_defect_label_xyz")
 
 
+def test_packaged_default_taxonomy_matches_repository_config(
+    taxonomy_yaml_path: Path,
+):
+    packaged = TaxonomyConfig.load_default()
+    repository = TaxonomyConfig.load_from_yaml(taxonomy_yaml_path)
+
+    assert packaged.raw_config == repository.raw_config
+
+
 def test_taxonomy_rejects_alias_collision_with_canonical_slug():
     with pytest.raises(ParsingError, match="alias 'porosity' is ambiguous"):
         TaxonomyConfig(
