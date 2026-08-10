@@ -74,6 +74,7 @@ def validate_smoke_export(
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """CVAT 왕복 검증 CLI의 명령행 인자를 구성한다."""
     parser = argparse.ArgumentParser(
         description="Validate an exact CVAT canonical annotation smoke-test round trip."
     )
@@ -90,6 +91,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """입력과 export 결과를 비교해 자동화용 종료 코드를 반환하는 진입점."""
     args = _build_parser().parse_args(argv)
     try:
         taxonomy = (

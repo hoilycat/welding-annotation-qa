@@ -3,7 +3,6 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-python_bin="${PYTHON:-python}"
 modality="RT"
 images=""
 annotations=""
@@ -26,7 +25,8 @@ Options:
   --replace             Explicitly replace existing Task annotations
   --help                Show this help
 
-Set PYTHON to select the Python executable and load CVAT credentials from .env.cvat.
+The script prefers .venv/bin/python, then python3. Set PYTHON to override it.
+CVAT credentials are loaded from .env.cvat.
 EOF
 }
 
@@ -55,6 +55,21 @@ if [[ -f "$repo_root/.env.cvat" ]]; then
     # shellcheck disable=SC1091
     source "$repo_root/.env.cvat"
     set +a
+fi
+
+# macOS에는 system `python` 명령이 없을 수 있으므로 저장소 가상환경과
+# `python3`를 먼저 찾는다. .env.cvat 또는 shell에서 PYTHON을 지정하면 이를 우선한다.
+if [[ -n "${PYTHON:-}" ]]; then
+    python_bin="$PYTHON"
+elif [[ -x "$repo_root/.venv/bin/python" ]]; then
+    python_bin="$repo_root/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    python_bin="$(command -v python3)"
+elif command -v python >/dev/null 2>&1; then
+    python_bin="$(command -v python)"
+else
+    echo "error: Python 3.10 or newer was not found. Create .venv or set PYTHON." >&2
+    exit 1
 fi
 
 absolute_existing_dir() {

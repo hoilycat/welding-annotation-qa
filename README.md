@@ -89,6 +89,17 @@ pip install -e ".[dev]"
 pytest
 ```
 
+macOS에서는 시스템 `python`이 없을 수 있으므로 `python3`로 가상환경을 만든 뒤
+설치하는 방식을 권장합니다.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev,cvat]"
+pytest
+```
+
 Python 코드에서는 이렇게 사용할 수 있습니다.
 
 ```python
@@ -154,6 +165,11 @@ cp .env.cvat.example .env.cvat
 ./scripts/cvat-local.sh bootstrap
 ./scripts/cvat-local.sh up
 ```
+
+macOS에서는 Docker Desktop과 Git이 먼저 준비되어 있어야 합니다. CVAT 화면은
+Safari 대신 Chrome 또는 Edge에서 여는 것을 권장합니다. smoke 스크립트는
+`PYTHON`을 지정하지 않으면 `.venv/bin/python`, `python3`, `python` 순서로 실행기를
+찾습니다.
 
 Windows PowerShell:
 
