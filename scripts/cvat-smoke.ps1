@@ -86,6 +86,13 @@ $exportPath = [System.IO.Path]::GetFullPath($ExportDir)
 if (-not (Test-Path -LiteralPath $imagesPath -PathType Container)) {
     throw "Image directory does not exist: $imagesPath"
 }
+$annotationsPath = $null
+if ($Annotations) {
+    $annotationsPath = [System.IO.Path]::GetFullPath($Annotations)
+    if (-not (Test-Path -LiteralPath $annotationsPath -PathType Container)) {
+        throw "Annotation directory does not exist: $annotationsPath"
+    }
+}
 
 $commonArgs = [System.Collections.Generic.List[string]]::new()
 $commonArgs.Add("--modality"); $commonArgs.Add($Modality)
@@ -95,52 +102,38 @@ if ($TaskName) { $commonArgs.Add("--task-name"); $commonArgs.Add($TaskName) }
 
 Push-Location -LiteralPath $repoRoot
 try {
-    Write-Output "[1/3] Ensure CVAT Task and upload images"
-    Invoke-QaModule -Arguments $commonArgs.ToArray()
-
-    if ($Annotations) {
-        Write-Output "[2/3] Synchronize annotations"
+    if ($annotationsPath) {
+        Write-Output "[1/2] Validate input, upload images, and synchronize annotations"
         $syncArgs = [System.Collections.Generic.List[string]]::new()
         $syncArgs.AddRange($commonArgs)
-        $syncArgs.Add("--annotations"); $syncArgs.Add([System.IO.Path]::GetFullPath($Annotations))
+        $syncArgs.Add("--annotations"); $syncArgs.Add($annotationsPath)
         if ($Replace) { $syncArgs.Add("--replace-annotations") }
         Invoke-QaModule -Arguments $syncArgs.ToArray()
     }
     else {
-        Write-Output "[2/3] No annotation directory supplied; skipping synchronization"
+        Write-Output "[1/2] Ensure CVAT Task and upload images"
+        Invoke-QaModule -Arguments $commonArgs.ToArray()
     }
 
-    Write-Output "[3/3] Export and validate canonical JSON"
+    Write-Output "[2/2] Export and validate canonical JSON"
     $exportArgs = [System.Collections.Generic.List[string]]::new()
     $exportArgs.AddRange($commonArgs)
     $exportArgs.Add("--export-annotations"); $exportArgs.Add($exportPath)
     Invoke-QaModule -Arguments $exportArgs.ToArray()
+
+    $validationArgs = [System.Collections.Generic.List[string]]::new()
+    $validationArgs.Add("--images"); $validationArgs.Add($imagesPath)
+    $validationArgs.Add("--export-dir"); $validationArgs.Add($exportPath)
+    $validationArgs.Add("--modality"); $validationArgs.Add($Modality)
+    if ($annotationsPath) {
+        $validationArgs.Add("--annotations"); $validationArgs.Add($annotationsPath)
+    }
+    $validationArgumentArray = $validationArgs.ToArray()
+    & $python -m welding_qa.smoke_validation @validationArgumentArray
+    if ($LASTEXITCODE -ne 0) {
+        throw "Export validation failed with code $LASTEXITCODE."
+    }
 }
 finally {
     Pop-Location
-}
-
-$env:EXPORT_DIR = $exportPath
-$env:IMAGES_DIR = $imagesPath
-$validation = @'
-import json
-import os
-from pathlib import Path
-
-export_dir = Path(os.environ["EXPORT_DIR"])
-images_dir = Path(os.environ["IMAGES_DIR"])
-extensions = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
-expected = sorted(path.stem + ".json" for path in images_dir.rglob("*") if path.is_file() and path.suffix.lower() in extensions)
-actual = sorted(path.name for path in export_dir.glob("*.json"))
-if actual != expected:
-    raise SystemExit(f"exported files do not match images: expected {expected}, got {actual}")
-for path in sorted(export_dir.glob("*.json")):
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload.get("annotations"), list):
-        raise SystemExit(f"export file has invalid annotations list: {path}")
-print(f"Smoke test passed: {len(actual)} exported files match {len(expected)} images.")
-'@
-& $python -c $validation
-if ($LASTEXITCODE -ne 0) {
-    throw "Export validation failed with code $LASTEXITCODE."
 }

@@ -13,6 +13,17 @@ from .riawelc_reader import parse_riawelc_json
 from .taxonomy import TaxonomyConfig
 
 
+def _read_validated_file_modality(path: Path) -> str:
+    """parser 검증을 통과한 빈 annotation JSON에서 modality를 다시 추출한다."""
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    info = data.get("info", {})
+    raw_modality = data.get(
+        "modality",
+        info.get("type", "RT") if isinstance(info, dict) else "RT",
+    )
+    return str(raw_modality).strip().upper()
+
+
 def build_qa_report(
     annotation_root: str | Path,
     taxonomy: TaxonomyConfig,
@@ -51,9 +62,11 @@ def build_qa_report(
         annotation_count += len(annotations)
         if annotations:
             modality_counts[annotations[0].modality] += 1
-        elif normalized_modality:
-            # 빈 annotation 파일도 expected_modality로 검증된 유효 이미지이므로 집계
-            modality_counts[normalized_modality] += 1
+        else:
+            # 빈 annotation 파일도 원본 JSON의 검사 방식을 modality 통계에 포함한다.
+            modality_counts[
+                normalized_modality or _read_validated_file_modality(path)
+            ] += 1
         for annotation in annotations:
             label_counts[annotation.label_canonical] += 1
 
@@ -93,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(json.dumps(report, ensure_ascii=False))
-    return 0
+    return 1 if report["files_invalid"] else 0
 
 
 if __name__ == "__main__":
