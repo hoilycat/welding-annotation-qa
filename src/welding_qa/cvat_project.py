@@ -185,8 +185,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--taxonomy",
         type=Path,
-        default=Path("configs/taxonomy.yaml"),
-        help="Path to the canonical taxonomy YAML",
+        help="Path to a custom taxonomy YAML (defaults to packaged canonical taxonomy)",
     )
     return parser
 
@@ -199,7 +198,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         # 로컬 taxonomy와 인증 설정을 읽은 뒤 호환성 검사를 마친 SDK client를 준비
-        taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
+        taxonomy = (
+            TaxonomyConfig.load_from_yaml(args.taxonomy)
+            if args.taxonomy
+            else TaxonomyConfig.load_default()
+        )
         settings = CvatSettings.from_environ()
         client = connect_cvat(settings)
         # 성공·실패와 관계없이 SDK 세션을 닫아 연결 자원을 정리하는 코드

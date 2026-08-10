@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 import yaml
@@ -72,6 +73,14 @@ class TaxonomyConfig:
         if not path.is_file():
             raise FileNotFoundError(f"Taxonomy config file not found: {path}")
         with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return cls(data or {})
+
+    @classmethod
+    def load_default(cls) -> TaxonomyConfig:
+        """설치된 wheel에도 포함되는 기본 canonical taxonomy를 읽는다."""
+        resource = files("welding_qa").joinpath("resources/taxonomy.yaml")
+        with resource.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls(data or {})
 

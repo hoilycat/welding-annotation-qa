@@ -81,14 +81,22 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--export-dir", required=True, type=Path)
     parser.add_argument("--annotations", type=Path)
     parser.add_argument("--modality", default="RT")
-    parser.add_argument("--taxonomy", type=Path, default=Path("configs/taxonomy.yaml"))
+    parser.add_argument(
+        "--taxonomy",
+        type=Path,
+        help="Path to a custom taxonomy YAML (defaults to packaged canonical taxonomy)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        taxonomy = TaxonomyConfig.load_from_yaml(args.taxonomy)
+        taxonomy = (
+            TaxonomyConfig.load_from_yaml(args.taxonomy)
+            if args.taxonomy
+            else TaxonomyConfig.load_default()
+        )
         result = validate_smoke_export(
             args.images,
             args.export_dir,

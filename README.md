@@ -34,7 +34,7 @@
 > JSON 검증, 라벨 정규화, CVAT Project/Task 생성과 annotation 동기화를 지원합니다.<br>
 > Canonical polygon export와 dataset QA 리포트를 제공하며 YOLO/COCO export는 다음 단계입니다.
 
-현재 테스트 스위트는 **131개**이며, 로컬 CVAT에서 이미지 업로드 → annotation 동기화 →
+현재 테스트 스위트는 **137개**이며, 로컬 CVAT에서 이미지 업로드 → annotation 동기화 →
 canonical JSON export 전체 smoke test도 통과했습니다.
 
 ---
@@ -365,7 +365,9 @@ welding-annotation-qa/
 │   ├── cvat_project.py        # CVAT Project 생성·재사용
 │   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
 │   ├── qa_report.py           # annotation 폴더 QA 집계 리포트
-│   └── smoke_validation.py    # 플랫폼 공통 exact round-trip 검증
+│   ├── smoke_validation.py    # 플랫폼 공통 exact round-trip 검증
+│   └── resources/
+│       └── taxonomy.yaml      # wheel에 포함되는 기본 canonical taxonomy
 ├── tests/
 │   ├── fixtures/              # 익명 샘플 JSON
 │   ├── test_cvat_converter.py
