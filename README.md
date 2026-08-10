@@ -226,6 +226,29 @@ python -m welding_qa.qa_report \
 리포트 파일은 잘못된 JSON의 상세 오류도 저장합니다. 유효하지 않은 파일이 하나라도 있으면
 CLI는 자동화에서 실패를 감지할 수 있도록 종료 코드 `1`을 반환합니다.
 
+### COCO instance segmentation으로 내보내기
+
+검증된 이미지와 RIAWELC JSON을 학습용 COCO Polygon JSON으로 변환할 수 있습니다.
+실제 이미지 크기와 파일 무결성도 함께 확인하며, JSON의 파일명·크기·Polygon 경계가
+이미지와 다르면 출력 파일을 만들지 않고 실패합니다.
+
+```bash
+python -m welding_qa.coco_export \
+  --images data/rt-images \
+  --annotations data/rt-annotations \
+  --modality RT \
+  --output exports/rt-coco.json
+```
+
+결함이 없는 정상 이미지도 COCO `images` 목록에는 유지되며 `annotations`만 비어 있습니다.
+JSON이 없는 이미지를 의도적으로 정상으로 취급하려면 `--allow-missing-annotations`를
+명시합니다. 기본값은 누락 JSON을 오류로 처리하므로, 깨끗한 이미지에는 가능한 한
+`annotations: []`가 있는 JSON을 준비하는 것이 안전합니다.
+
+category ID는 `configs/taxonomy.yaml`의 canonical class 순서로 1부터 결정됩니다.
+각 annotation에는 COCO Polygon `segmentation`, shoelace 면적, bounding box와
+`iscrowd: 0`이 기록됩니다.
+
 Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
 
 ```powershell
@@ -381,6 +404,7 @@ welding-annotation-qa/
 │   ├── cvat_project.py        # CVAT Project 생성·재사용
 │   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
 │   ├── qa_report.py           # annotation 폴더 QA 집계 리포트
+│   ├── coco_export.py         # COCO Polygon segmentation export
 │   ├── smoke_validation.py    # 플랫폼 공통 exact round-trip 검증
 │   └── resources/
 │       └── taxonomy.yaml      # wheel에 포함되는 기본 canonical taxonomy
@@ -389,6 +413,7 @@ welding-annotation-qa/
 │   ├── test_cvat_converter.py
 │   ├── test_cvat_project.py
 │   ├── test_cvat_task.py
+│   ├── test_coco_export.py
 │   ├── test_qa_report.py
 │   ├── test_smoke_validation.py
 │   ├── test_taxonomy.py
@@ -415,7 +440,8 @@ welding-annotation-qa/
 - [x] CVAT Project 자동 생성
 - [x] CVAT Task 자동 생성과 이미지 업로드
 - [x] CVAT annotation 동기화 및 canonical polygon export
-- [ ] YOLO/COCO export profile
+- [x] COCO Polygon instance segmentation export
+- [ ] YOLO segmentation export profile
 - [x] 기본 annotation QA 리포트
 - [ ] Validation dashboard와 Release Manifest
 

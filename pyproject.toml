@@ -9,6 +9,7 @@ description = "CVAT-based Welding Defect Annotation QA and Curation Pipeline"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "Pillow>=10.0",
     "pyyaml>=6.0",
 ]
 
