@@ -57,45 +57,45 @@ if [[ -f "$repo_root/.env.cvat" ]]; then
     set +a
 fi
 
+absolute_existing_dir() {
+    local directory="$1"
+    if [[ ! -d "$directory" ]]; then
+        echo "error: directory does not exist: $directory" >&2
+        exit 1
+    fi
+    (cd "$directory" && pwd -P)
+}
+
+# 호출 위치와 무관하게 CVAT CLI와 최종 검증기가 같은 directory를 사용하게 한다.
+images="$(absolute_existing_dir "$images")"
+if [[ -n "$annotations" ]]; then
+    annotations="$(absolute_existing_dir "$annotations")"
+fi
+mkdir -p "$export_dir"
+export_dir="$(absolute_existing_dir "$export_dir")"
+
 common_args=(--modality "$modality" --images "$images")
 [[ -n "$project_name" ]] && common_args+=(--project-name "$project_name")
 [[ -n "$task_name" ]] && common_args+=(--task-name "$task_name")
 
-echo "[1/3] Ensure CVAT Task and upload images"
-(cd "$repo_root" && "$python_bin" -m welding_qa.cvat_task "${common_args[@]}")
-
 if [[ -n "$annotations" ]]; then
-    echo "[2/3] Synchronize annotations"
+    echo "[1/2] Validate input, upload images, and synchronize annotations"
     sync_args=("${common_args[@]}" --annotations "$annotations")
     ((replace)) && sync_args+=(--replace-annotations)
     (cd "$repo_root" && "$python_bin" -m welding_qa.cvat_task "${sync_args[@]}")
 else
-    echo "[2/3] No annotation directory supplied; skipping synchronization"
+    echo "[1/2] Ensure CVAT Task and upload images"
+    (cd "$repo_root" && "$python_bin" -m welding_qa.cvat_task "${common_args[@]}")
 fi
 
-echo "[3/3] Export and validate canonical JSON"
+echo "[2/2] Export and validate canonical JSON"
 export_args=("${common_args[@]}" --export-annotations "$export_dir")
 (cd "$repo_root" && "$python_bin" -m welding_qa.cvat_task "${export_args[@]}")
 
-EXPORT_DIR="$export_dir" IMAGES_DIR="$images" "$python_bin" - <<'PY'
-import json
-import os
-from pathlib import Path
-
-export_dir = Path(os.environ["EXPORT_DIR"])
-images_dir = Path(os.environ["IMAGES_DIR"])
-expected = sorted(
-    path.name
-    for path in images_dir.rglob("*")
-    if path.is_file() and path.suffix.lower() in {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
+validation_args=(
+    --images "$images"
+    --export-dir "$export_dir"
+    --modality "$modality"
 )
-actual = sorted(path.stem + ".json" for path in export_dir.glob("*.json"))
-expected_json = sorted(Path(name).stem + ".json" for name in expected)
-if actual != expected_json:
-    raise SystemExit(f"exported files do not match images: expected {expected_json}, got {actual}")
-for path in sorted(export_dir.glob("*.json")):
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload.get("annotations"), list):
-        raise SystemExit(f"export file has invalid annotations list: {path}")
-print(f"Smoke test passed: {len(actual)} exported files match {len(expected)} images.")
-PY
+[[ -n "$annotations" ]] && validation_args+=(--annotations "$annotations")
+(cd "$repo_root" && "$python_bin" -m welding_qa.smoke_validation "${validation_args[@]}")

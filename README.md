@@ -34,7 +34,7 @@
 > JSON 검증, 라벨 정규화, CVAT Project/Task 생성과 annotation 동기화를 지원합니다.<br>
 > Canonical polygon export와 dataset QA 리포트를 제공하며 YOLO/COCO export는 다음 단계입니다.
 
-현재 테스트 스위트는 **125개**이며, 로컬 CVAT에서 이미지 업로드 → annotation 동기화 →
+현재 테스트 스위트는 **131개**이며, 로컬 CVAT에서 이미지 업로드 → annotation 동기화 →
 canonical JSON export 전체 smoke test도 통과했습니다.
 
 ---
@@ -176,7 +176,9 @@ Docker socket 권한이 제한된 환경에서도 실제 서비스가 응답하�
 
 이미지 업로드부터 annotation 동기화와 canonical export까지 한 번에 확인하려면
 smoke test 스크립트를 사용할 수 있습니다. `--replace`는 기존 Task의 annotation을
-명시적으로 교체하므로 테스트 전용 Task에서만 사용합니다.
+명시적으로 교체하므로 테스트 전용 Task에서만 사용합니다. annotation 폴더를 전달하면
+CVAT 자원을 만들기 전에 입력 전체를 검증하고, export 후 canonical 라벨과 모든 Polygon
+좌표가 입력과 정확히 일치하는지 확인합니다.
 
 ```bash
 PYTHON=.venv/bin/python ./scripts/cvat-smoke.sh \
@@ -204,6 +206,9 @@ python -m welding_qa.qa_report \
   --modality RT \
   --output reports/rt-qa.json
 ```
+
+리포트 파일은 잘못된 JSON의 상세 오류도 저장합니다. 유효하지 않은 파일이 하나라도 있으면
+CLI는 자동화에서 실패를 감지할 수 있도록 종료 코드 `1`을 반환합니다.
 
 Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
 
@@ -359,13 +364,15 @@ welding-annotation-qa/
 │   ├── cvat_converter.py      # CVAT Polygon 양방향 변환
 │   ├── cvat_project.py        # CVAT Project 생성·재사용
 │   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
-│   └── qa_report.py            # annotation 폴더 QA 집계 리포트
+│   ├── qa_report.py           # annotation 폴더 QA 집계 리포트
+│   └── smoke_validation.py    # 플랫폼 공통 exact round-trip 검증
 ├── tests/
 │   ├── fixtures/              # 익명 샘플 JSON
 │   ├── test_cvat_converter.py
 │   ├── test_cvat_project.py
 │   ├── test_cvat_task.py
 │   ├── test_qa_report.py
+│   ├── test_smoke_validation.py
 │   ├── test_taxonomy.py
 │   └── test_riawelc_reader.py
 ├── scripts/

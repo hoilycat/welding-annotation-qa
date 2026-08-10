@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from welding_qa.qa_report import build_qa_report
+from welding_qa.qa_report import build_qa_report, main
 from welding_qa.taxonomy import TaxonomyConfig
 
 
@@ -58,3 +58,36 @@ def test_build_qa_report_rejects_wrong_modality(tmp_path: Path):
 
     assert report["files_invalid"] == 1
     assert "does not match expected modality" in report["errors"][0]["error"]
+
+
+def test_build_qa_report_counts_empty_file_modality_without_filter(tmp_path: Path):
+    taxonomy = TaxonomyConfig.load_from_yaml("configs/taxonomy.yaml")
+    (tmp_path / "empty.json").write_text(
+        json.dumps({"info": {"type": "VT"}, "annotations": []}),
+        encoding="utf-8",
+    )
+
+    report = build_qa_report(tmp_path, taxonomy)
+
+    assert report["modality_counts"] == {"VT": 1}
+
+
+def test_qa_report_cli_returns_failure_but_writes_invalid_report(
+    tmp_path: Path,
+):
+    annotation_dir = tmp_path / "annotations"
+    annotation_dir.mkdir()
+    (annotation_dir / "bad.json").write_text("{invalid", encoding="utf-8")
+    output_path = tmp_path / "report.json"
+
+    exit_code = main(
+        [
+            "--annotations",
+            str(annotation_dir),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 1
+    assert json.loads(output_path.read_text(encoding="utf-8"))["files_invalid"] == 1
