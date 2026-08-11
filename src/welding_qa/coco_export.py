@@ -9,26 +9,9 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from PIL import Image, UnidentifiedImageError
-
-from .cvat_task import collect_image_paths, load_annotations_for_images
-from .models import DefectAnnotation, ParsingError, Polygon
+from .dataset_export import validate_export_dataset
+from .models import ParsingError, Polygon
 from .taxonomy import TaxonomyConfig
-
-
-def _read_image_size(path: Path) -> tuple[int, int]:
-    """실제 이미지 파일을 검증하고 COCO에 기록할 pixel 크기를 읽는다."""
-    try:
-        with Image.open(path) as image:
-            width, height = image.size
-            # size header만 읽고 성공하는 손상 파일을 막기 위해 전체 구조도 검증한다.
-            image.verify()
-    except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
-        raise ParsingError(f"Could not read image '{path}': {exc}") from exc
-
-    if width <= 0 or height <= 0:
-        raise ParsingError(f"Image '{path}' must have positive width and height.")
-    return width, height
 
 
 def _polygon_area(polygon: Polygon) -> float:
@@ -49,38 +32,6 @@ def _polygon_bbox(polygon: Polygon) -> list[float]:
     return [min_x, min_y, max_x - min_x, max_y - min_y]
 
 
-def _validate_annotation_image_metadata(
-    annotation: DefectAnnotation,
-    image_path: Path,
-    width: int,
-    height: int,
-) -> None:
-    """JSON 이미지 메타데이터가 실제 매칭된 파일과 모순되지 않는지 확인한다."""
-    metadata = annotation.extra_meta
-    metadata_filename = metadata.get("filename")
-    if metadata_filename:
-        # 다른 OS에서 기록한 경로도 basename 비교가 되도록 두 separator를 통일한다.
-        normalized_name = str(metadata_filename).replace("\\", "/").rsplit("/", 1)[-1]
-        if normalized_name.casefold() != image_path.name.casefold():
-            raise ParsingError(
-                f"Annotation image filename '{metadata_filename}' does not match "
-                f"actual image '{image_path.name}'."
-            )
-
-    for field_name, metadata_value, actual_value in (
-        ("width", metadata.get("width"), width),
-        ("height", metadata.get("height"), height),
-    ):
-        if metadata_value is not None and float(metadata_value) != float(actual_value):
-            raise ParsingError(
-                f"Annotation image {field_name} {metadata_value} does not match "
-                f"actual image {field_name} {actual_value} for '{image_path.name}'."
-            )
-
-    # JSON에 크기가 없더라도 실제 이미지 기준으로 Polygon 경계를 다시 검사한다.
-    annotation.polygon.validate_image_bounds(width=width, height=height)
-
-
 def build_coco_dataset(
     image_root: str | Path,
     annotation_root: str | Path,
@@ -90,58 +41,34 @@ def build_coco_dataset(
     allow_missing_annotations: bool = False,
 ) -> dict[str, Any]:
     """이미지와 RIAWELC JSON 폴더를 검증해 결정적인 COCO dataset을 만든다."""
-    root = Path(image_root)
-    image_paths = collect_image_paths(root)
-    annotations_by_image = load_annotations_for_images(
+    dataset = validate_export_dataset(
+        image_root,
         annotation_root,
-        image_paths,
         taxonomy,
         modality=modality,
-        allow_missing=allow_missing_annotations,
+        allow_missing_annotations=allow_missing_annotations,
     )
-
-    normalized_modality = modality.strip().upper()
-    category_names = [
-        slug
-        for slug in taxonomy.canonical_classes
-        if taxonomy.is_modality_allowed(slug, normalized_modality)
-    ]
-    if not category_names:
-        raise ParsingError(
-            f"No COCO categories are configured for modality '{normalized_modality}'."
-        )
+    category_names = dataset.category_names
     category_ids = {name: index for index, name in enumerate(category_names, start=1)}
 
     coco_images: list[dict[str, Any]] = []
     coco_annotations: list[dict[str, Any]] = []
     annotation_id = 1
-    resolved_root = root.resolve()
 
-    for image_id, image_path in enumerate(image_paths, start=1):
-        width, height = _read_image_size(image_path)
+    for image_id, image in enumerate(dataset.images, start=1):
         coco_images.append(
             {
                 "id": image_id,
-                "file_name": image_path.relative_to(resolved_root).as_posix(),
-                "width": width,
-                "height": height,
+                "file_name": image.relative_path,
+                "width": image.width,
+                "height": image.height,
             }
         )
 
-        for annotation in annotations_by_image[image_path.name]:
-            try:
-                _validate_annotation_image_metadata(
-                    annotation,
-                    image_path,
-                    width,
-                    height,
-                )
-            except (ParsingError, TypeError, ValueError) as exc:
-                raise ParsingError(f"Image '{image_path.name}': {exc}") from exc
-
+        for annotation in image.annotations:
             if annotation.label_canonical not in category_ids:
                 raise ParsingError(
-                    f"Image '{image_path.name}' has no COCO category for canonical label "
+                    f"Image '{image.path.name}' has no COCO category for canonical label "
                     f"'{annotation.label_canonical}'."
                 )
 
