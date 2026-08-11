@@ -4,10 +4,10 @@
 
 ### 용접 결함 라벨을 가지런히 정리하는 데이터 QA 도구
 
-![version](https://img.shields.io/badge/version-0.3-E76F51?style=flat-square)
-![status](https://img.shields.io/badge/status-foundation-F4A261?style=flat-square)
+![version](https://img.shields.io/badge/version-0.4-E76F51?style=flat-square)
+![status](https://img.shields.io/badge/status-Phase%203%20MVP-F4A261?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![Pytest](https://img.shields.io/badge/tests-155%20passed-2A9D8F?style=flat-square&logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/tests-172%20passed-2A9D8F?style=flat-square&logo=pytest&logoColor=white)
 
 > **“모델이 배우기 전에, 라벨부터 가지런히.”**<br>
 > 제각각인 용접 결함 Polygon JSON을 검사하고 하나의 표준 이름으로 정리합니다.
@@ -33,6 +33,8 @@ slag / Slag / 슬래그 → slag_inclusion
 | 데이터 검증 | 필수 필드, 좌표 범위, polygon 구조, 정상 이미지 규칙 검사 |
 | CVAT 연동 | Project/Task 생성·재사용, 이미지 업로드, 어노테이션 동기화·내보내기 |
 | QA 리포트 | 오류 위치와 원인을 JSON 리포트로 저장 |
+| Dataset 검수 | Polygon 충돌·중첩, 이미지 중복, 이미지·JSON 대응 검사 |
+| QA 대시보드 | Release Manifest와 로컬 정적 HTML 대시보드 생성 |
 | COCO 내보내기 | polygon, bbox, area를 포함한 COCO JSON 생성 |
 | YOLO 내보내기 | 정규화된 polygon 좌표와 클래스 파일 생성 |
 
@@ -102,6 +104,9 @@ python -m welding_qa.coco_export --images data/images --annotations data/annotat
 
 # YOLO Segmentation 데이터셋 생성
 python -m welding_qa.yolo_export --images data/images --annotations data/annotations --output-dir exports/yolo
+
+# Phase 3 QA 대시보드와 Release Manifest 생성
+python -m welding_qa.release_report --images data/images --annotations data/annotations --output-dir reports/release
 ```
 
 CVAT 서버 설치와 업로드·동기화 명령은 아래 문서에서 확인할 수 있습니다.
@@ -113,6 +118,7 @@ CVAT 서버 설치와 업로드·동기화 명령은 아래 문서에서 확인�
 | [CVAT 로컬 서버 설정](docs/cvat-setup.md) | Docker 설치, 서버 시작·종료, 계정, 상태 확인, smoke test |
 | [어노테이션 작업 흐름](docs/annotation-workflow.md) | 입력 형식, QA, CVAT Project/Task, 동기화와 백업 |
 | [COCO·YOLO 내보내기](docs/export-formats.md) | 출력 형식, 클래스 ID, 안전 규칙과 사용 예시 |
+| [QA 대시보드와 Release Manifest](docs/qa-dashboard.md) | 충돌·중복 검사, 결과 상태, 대시보드 실행 방법 |
 | [프로젝트 계획](docs/project-plan.md) | 단계별 목표와 향후 작업 |
 
 ## 데이터 흐름
@@ -129,6 +135,8 @@ flowchart LR
     E --> F["CVAT<br/>검토·수정"]
     E --> G["COCO JSON"]
     E --> H["YOLO Segmentation"]
+    E --> J["Dataset-level QA"]
+    J --> K["Release Manifest<br/>HTML Dashboard"]
 
     F --> I["Canonical JSON 백업"]
 ```
@@ -140,9 +148,10 @@ flowchart LR
 ## 현재 상태
 
 - Python 3.10 이상과 Windows·macOS 스크립트 지원
-- 테스트 155개 통과
+- 테스트 172개 통과
 - CVAT Project/Task 생성, 재사용, 동기화, 백업 지원
 - COCO 및 YOLO Segmentation 내보내기 지원
+- Dataset-level 충돌·중복 검사 및 정적 QA 대시보드 지원
 
 ---
 

@@ -25,11 +25,12 @@ CVAT 기반 용접 어노테이션 데이터셋의 품질 검증, 표준 Taxonom
 - [x] YOLO segmentation 데이터셋 내보내기
 - [x] Windows·macOS 로컬 CVAT 실행 및 smoke test 스크립트
 
-### Phase 3: Automated QA & Validation Dashboard (Upcoming)
-- [ ] Annotation 간 레이블 충돌 및 중첩 자동 검수기
-- [ ] Duplicate Image Detection (Perceptual Hashing)
-- [ ] QA Validation Dashboard 및 Release Manifest 릴리스 연동
+### Phase 3: Automated QA & Validation Dashboard (MVP Complete)
+- [x] Annotation 간 레이블 충돌 및 중첩 자동 검수기
+- [x] Duplicate Image Detection (SHA-256 + Perceptual Hashing)
+- [x] 정적 QA Validation Dashboard 및 Release Manifest 생성
+- [ ] Release Manifest의 CI 검증 및 데이터 릴리스 정책 연동
 
 이미지 경계와 Polygon 기하 유효성 검사는 Phase 1의 reader/model 검증에서
-지원합니다. Phase 3에서는 여러 annotation과 이미지 파일을 함께 비교하는
-dataset-level 검수로 범위를 확장합니다.
+지원합니다. Phase 3 MVP는 여러 annotation과 이미지 파일을 함께 비교하는
+dataset-level 검수와 로컬 HTML 결과 확인까지 범위를 확장했습니다.
