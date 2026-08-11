@@ -66,6 +66,7 @@ def test_build_release_manifest_contains_checksums_and_passed_status(tmp_path: P
     )
 
     assert manifest["status"] == "passed"
+    assert manifest["status_reasons"][0]["code"] == "all_checks_clear"
     assert manifest["summary"] == {
         "images": 1,
         "valid_files": 1,
@@ -95,6 +96,7 @@ def test_build_release_manifest_marks_invalid_json_as_failed(tmp_path: Path):
 
     assert manifest["status"] == "failed"
     assert manifest["summary"]["blocking_errors"] == 1
+    assert manifest["status_reasons"][0]["code"] == "invalid_annotation_files"
 
 
 def test_build_release_manifest_marks_overlap_candidate_for_review(tmp_path: Path):
@@ -111,6 +113,7 @@ def test_build_release_manifest_marks_overlap_candidate_for_review(tmp_path: Pat
     manifest = build_release_manifest(image_root, annotation_root, taxonomy)
 
     assert manifest["status"] == "review"
+    assert manifest["status_reasons"][0]["code"] == "annotation_review_candidates"
     assert manifest["checks"]["annotation_issue_counts"] == {
         "possible_duplicate_annotation": 1
     }
@@ -126,6 +129,8 @@ def test_render_dashboard_uses_weldvision_theme_and_real_summary(tmp_path: Path)
     assert "🔥 Welding QA" in dashboard
     assert "WeldVision · Annotation Control" in dashboard
     assert "검수 통과" in dashboard
+    assert "왜 이 상태로 판정됐나요?" in dashboard
+    assert "Hash 거리" in dashboard
     assert "porosity" in dashboard
     assert manifest["dataset_digest"] in dashboard
 
@@ -187,6 +192,7 @@ def test_release_bundle_adds_side_by_side_duplicate_thumbnails(tmp_path: Path):
     dashboard = (output_dir / "dashboard.html").read_text(encoding="utf-8")
     assert "유사 이미지 비교 · 2장 / 1쌍" in dashboard
     assert 'src="thumbnails/candidate-001.jpg"' in dashboard
+    assert "중복 확정은 아닙니다" in dashboard
 
 
 def test_release_report_cli_writes_dashboard(tmp_path: Path):

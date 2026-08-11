@@ -75,13 +75,50 @@ def _render_annotation_issues(issues: list[dict[str, Any]]) -> str:
     """
 
 
-def _render_duplicate_pairs(pairs: list[dict[str, Any]]) -> str:
+def _render_status_reasons(reasons: list[dict[str, Any]]) -> str:
+    """자동 상태가 결정된 직접 근거를 사람이 읽는 카드로 만든다."""
+    return "".join(
+        f"""
+        <div class="reason-card">
+          <strong>{int(reason.get('count', 0))}</strong>
+          <div><code>{_text(reason.get('code', 'unknown'))}</code><p>{_text(reason.get('message', ''))}</p></div>
+        </div>
+        """
+        for reason in reasons
+    )
+
+
+def _render_metric_guide(thresholds: dict[str, Any]) -> str:
+    """IoU와 perceptual hash 수치를 읽는 기준을 현재 실행값으로 설명한다."""
+    return f"""
+      <div class="metric-guide">
+        <div><b>IoU</b><span>0~1 사이 값이며 1에 가까울수록 Polygon 모양이 비슷합니다. 중복 annotation 기준은 <strong>{float(thresholds.get('duplicate_annotation_iou', 0.9)):.2f}</strong>입니다.</span></div>
+        <div><b>Hash 거리</b><span>0~128 사이 값이며 0에 가까울수록 이미지 구조가 비슷합니다. 현재 후보 기준은 <strong>{int(thresholds.get('perceptual_hash_distance', 8))} 이하</strong>입니다.</span></div>
+        <div><b>밝기 Δ</b><span>평균 밝기 차이입니다. 현재 후보 기준은 <strong>{float(thresholds.get('brightness_tolerance', 24)):.1f} 이하</strong>이며 Hash 거리와 함께 만족해야 합니다.</span></div>
+      </div>
+    """
+
+
+def _render_duplicate_pairs(
+    pairs: list[dict[str, Any]],
+    thresholds: dict[str, Any],
+) -> str:
     if not pairs:
         return '<p class="empty good">중복 또는 유사 이미지 후보가 없습니다.</p>'
     cards = []
     for pair_index, pair in enumerate(pairs, start=1):
         files = pair.get("files", ["", ""])
         thumbnails = pair.get("thumbnails", [])
+        hash_distance = int(pair.get("hamming_distance", 0))
+        brightness_difference = float(pair.get("brightness_difference", 0))
+        if pair.get("code") == "exact_duplicate":
+            explanation = "SHA-256 checksum이 같아 파일 내용이 완전히 동일합니다."
+        else:
+            explanation = (
+                f"Hash 거리 {hash_distance} ≤ {int(thresholds.get('perceptual_hash_distance', 8))}, "
+                f"밝기 차이 {brightness_difference:.1f} ≤ {float(thresholds.get('brightness_tolerance', 24)):.1f}이므로 "
+                "시각적 유사 후보로 분류됐습니다. 중복 확정은 아닙니다."
+            )
 
         def render_candidate(index: int) -> str:
             file_name = files[index] if len(files) > index else ""
@@ -101,9 +138,10 @@ def _render_duplicate_pairs(pairs: list[dict[str, Any]]) -> str:
             <article class="pair-card">
               <div class="pair-heading">
                 <div><span>PAIR {pair_index:02d}</span><code>{_text(pair.get('code', 'unknown'))}</code></div>
-                <div class="pair-metrics"><strong>Hash {int(pair.get('hamming_distance', 0))}</strong><strong>밝기 Δ {float(pair.get('brightness_difference', 0)):.1f}</strong></div>
+                <div class="pair-metrics"><strong>Hash {hash_distance}</strong><strong>밝기 Δ {brightness_difference:.1f}</strong></div>
               </div>
               <div class="comparison-grid">{render_candidate(0)}{render_candidate(1)}</div>
+              <p class="pair-explanation">{_text(explanation)}</p>
             </article>
             """
         )
@@ -126,6 +164,7 @@ def render_dashboard(manifest: dict[str, Any]) -> str:
     checks = manifest["checks"]
     annotation_issues = checks["annotation_issues"]
     duplicate_images = checks["duplicate_images"]
+    thresholds = manifest.get("thresholds", {})
     status_text, status_class = _status_copy(str(manifest["status"]))
     errors = (
         list(qa.get("errors", []))
@@ -174,10 +213,13 @@ def render_dashboard(manifest: dict[str, Any]) -> str:
     .pair-heading {{ display:flex; justify-content:space-between; gap:16px; align-items:center; padding:13px 15px; border-bottom:1px solid #2b2e38; }} .pair-heading>div:first-child {{ display:flex; gap:10px; align-items:center; }} .pair-heading span {{ color:var(--orange); font:700 11px ui-monospace,monospace; }}
     .pair-metrics {{ display:flex; gap:8px; }} .pair-metrics strong {{ color:var(--muted); background:#1b1e27; border-radius:99px; padding:5px 9px; font-size:11px; }}
     .comparison-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#333641; }} figure {{ margin:0; min-width:0; background:#0a0b0f; }} figure img,.thumbnail-missing {{ display:block; width:100%; aspect-ratio:16/9; object-fit:contain; background:#07080b; }} .thumbnail-missing {{ display:grid; place-items:center; color:var(--muted); }} figcaption {{ padding:10px 12px; color:#d7d3ce; font:12px ui-monospace,monospace; overflow-wrap:anywhere; }}
+    .pair-explanation {{ margin:0; padding:12px 15px; color:#c6c1ba; font-size:12px; border-top:1px solid #2b2e38; background:#15171f; }}
+    .decision-panel {{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr); gap:22px; margin-bottom:18px; }} .decision-panel h2 {{ grid-column:1/-1; margin-bottom:0; }} .reason-list {{ display:grid; gap:10px; }} .reason-card {{ display:grid; grid-template-columns:44px 1fr; align-items:start; gap:12px; padding:13px; background:#11131a; border:1px solid #2d303a; border-radius:12px; }} .reason-card>strong {{ color:var(--orange); font-size:26px; line-height:1; }} .reason-card p {{ color:#c6c1ba; margin:6px 0 0; font-size:13px; }}
+    .metric-guide {{ display:grid; gap:10px; }} .metric-guide>div {{ padding:13px; border-left:3px solid var(--orange); background:#171921; border-radius:0 10px 10px 0; }} .metric-guide b {{ display:block; margin-bottom:5px; }} .metric-guide span {{ color:var(--muted); font-size:12px; line-height:1.55; }} .metric-guide strong {{ color:var(--yellow); }}
     .error-line {{ display:grid; grid-template-columns:minmax(140px,1fr) 2fr; gap:14px; padding:12px 0; border-bottom:1px solid var(--line); }} .error-line span {{ color:#ffb0b0; }}
     .release {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }} .release div {{ background:#11131a; border:1px solid #292c35; border-radius:12px; padding:14px; }} .release span {{ display:block; color:var(--muted); font-size:12px; margin-bottom:8px; }} .release strong,.release code {{ word-break:break-all; font-size:13px; }}
     footer {{ color:#7f8490; text-align:center; margin-top:30px; font-size:12px; }}
-    @media (max-width:820px) {{ .cards {{ grid-template-columns:1fr 1fr; }} .grid {{ grid-template-columns:1fr; }} .panel.wide {{ grid-column:auto; }} .release {{ grid-template-columns:1fr; }} }}
+    @media (max-width:820px) {{ .cards {{ grid-template-columns:1fr 1fr; }} .grid {{ grid-template-columns:1fr; }} .panel.wide {{ grid-column:auto; }} .release {{ grid-template-columns:1fr; }} .decision-panel {{ grid-template-columns:1fr; }} .decision-panel h2 {{ grid-column:auto; }} }}
     @media (max-width:520px) {{ .shell {{ width:min(100% - 20px,1180px); padding-top:28px; }} header {{ align-items:flex-start; flex-direction:column; }} .cards {{ grid-template-columns:1fr; }} .distribution-row {{ grid-template-columns:1fr 36px; }} .distribution-track {{ grid-column:1/-1; grid-row:2; }} .pair-heading {{ align-items:flex-start; flex-direction:column; }} .comparison-grid {{ grid-template-columns:1fr; }} }}
   </style>
 </head>
@@ -195,11 +237,17 @@ def render_dashboard(manifest: dict[str, Any]) -> str:
       <article class="card"><span>검토 항목</span><strong>{int(summary['review_items'])}</strong><em>{duplicate_file_count} IMAGES · {duplicate_pair_count} PAIRS</em></article>
     </section>
 
+    <section class="panel decision-panel" aria-label="자동 판정 설명">
+      <h2><span>?</span>왜 이 상태로 판정됐나요?</h2>
+      <div class="reason-list">{_render_status_reasons(manifest.get('status_reasons', []))}</div>
+      {_render_metric_guide(thresholds)}
+    </section>
+
     <section class="grid">
       <article class="panel"><h2><span>◈</span>결함 분포</h2>{_render_label_distribution(qa.get('label_counts', {}))}</article>
       <article class="panel"><h2><span>◎</span>검사 방식</h2>{_render_label_distribution(qa.get('modality_counts', {}))}</article>
       <article class="panel wide"><h2><span>⚠</span>Annotation 충돌·중첩</h2>{_render_annotation_issues(annotation_issues)}</article>
-      <article class="panel wide"><h2><span>▣</span>유사 이미지 비교 · {duplicate_file_count}장 / {duplicate_pair_count}쌍</h2>{_render_duplicate_pairs(duplicate_images.get('pairs', []))}</article>
+      <article class="panel wide"><h2><span>▣</span>유사 이미지 비교 · {duplicate_file_count}장 / {duplicate_pair_count}쌍</h2>{_render_duplicate_pairs(duplicate_images.get('pairs', []), thresholds)}</article>
       <article class="panel wide"><h2><span>×</span>파싱·파일 오류</h2>{_render_errors(errors)}</article>
       <article class="panel wide"><h2><span>⌁</span>Release Manifest</h2>
         <div class="release">

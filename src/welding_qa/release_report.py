@@ -121,6 +121,7 @@ def build_release_manifest(
     overlap_threshold: float = 0.10,
     duplicate_annotation_iou: float = 0.90,
     perceptual_distance: int = 8,
+    brightness_tolerance: float = 24.0,
 ) -> dict[str, Any]:
     """기본 QA와 dataset-level 검사를 실행해 release manifest를 반환한다."""
     qa = build_qa_report(annotation_root, taxonomy, modality=modality)
@@ -134,6 +135,7 @@ def build_release_manifest(
     duplicate_images = find_duplicate_images(
         image_root,
         perceptual_distance=perceptual_distance,
+        brightness_tolerance=brightness_tolerance,
     )
     alignment_issues = find_dataset_alignment_issues(image_root, annotation_root)
     annotation_inventory = _annotation_inventory(annotation_root)
@@ -150,12 +152,66 @@ def build_release_manifest(
         + len(alignment_issues)
     )
     status = "failed" if blocking_errors else "review" if review_items else "passed"
+    annotation_issue_counts = summarize_issue_codes(annotation_issues)
+    status_reasons: list[dict[str, Any]] = []
+    if qa["files_invalid"]:
+        status_reasons.append(
+            {
+                "code": "invalid_annotation_files",
+                "count": qa["files_invalid"],
+                "message": "파싱 또는 taxonomy 검증을 통과하지 못한 JSON이 있습니다.",
+            }
+        )
+    if alignment_issues:
+        status_reasons.append(
+            {
+                "code": "dataset_alignment_errors",
+                "count": len(alignment_issues),
+                "message": "이미지와 annotation JSON의 일대일 대응을 확인해야 합니다.",
+            }
+        )
+    if duplicate_images["errors"]:
+        status_reasons.append(
+            {
+                "code": "unreadable_images",
+                "count": len(duplicate_images["errors"]),
+                "message": "읽거나 hash를 계산할 수 없는 이미지가 있습니다.",
+            }
+        )
+    if annotation_issues:
+        status_reasons.append(
+            {
+                "code": "annotation_review_candidates",
+                "count": len(annotation_issues),
+                "message": "IoU 기준을 넘은 라벨 충돌·중첩 후보가 있습니다.",
+            }
+        )
+    if duplicate_images["pairs"]:
+        status_reasons.append(
+            {
+                "code": "similar_image_pairs",
+                "count": len(duplicate_images["pairs"]),
+                "message": (
+                    f"Perceptual hash 거리 {perceptual_distance} 이하, 밝기 차이 "
+                    f"{brightness_tolerance:g} 이하인 이미지 쌍이 있습니다."
+                ),
+            }
+        )
+    if not status_reasons:
+        status_reasons.append(
+            {
+                "code": "all_checks_clear",
+                "count": 0,
+                "message": "파싱, 대응, Polygon 겹침과 이미지 중복 검사에서 검토 후보가 없습니다.",
+            }
+        )
 
     normalized_modality = modality.strip().upper() if isinstance(modality, str) else None
     manifest = {
         "schema_version": "1.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": status,
+        "status_reasons": status_reasons,
         "modality": normalized_modality,
         "dataset_digest": _dataset_digest(annotation_inventory, image_inventory),
         "sources": {
@@ -171,6 +227,7 @@ def build_release_manifest(
             "overlap_ratio": overlap_threshold,
             "duplicate_annotation_iou": duplicate_annotation_iou,
             "perceptual_hash_distance": perceptual_distance,
+            "brightness_tolerance": brightness_tolerance,
         },
         "summary": {
             "images": duplicate_images["images_scanned"],
@@ -185,7 +242,7 @@ def build_release_manifest(
         "qa": qa,
         "checks": {
             "alignment_issues": alignment_issues,
-            "annotation_issue_counts": summarize_issue_codes(annotation_issues),
+            "annotation_issue_counts": annotation_issue_counts,
             "annotation_issues": annotation_issues,
             "duplicate_images": duplicate_images,
         },
@@ -309,6 +366,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--overlap-threshold", type=float, default=0.10)
     parser.add_argument("--duplicate-annotation-iou", type=float, default=0.90)
     parser.add_argument("--perceptual-distance", type=int, default=8)
+    parser.add_argument("--brightness-tolerance", type=float, default=24.0)
     return parser
 
 
@@ -328,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
             overlap_threshold=args.overlap_threshold,
             duplicate_annotation_iou=args.duplicate_annotation_iou,
             perceptual_distance=args.perceptual_distance,
+            brightness_tolerance=args.brightness_tolerance,
         )
         output = write_release_bundle(
             manifest,

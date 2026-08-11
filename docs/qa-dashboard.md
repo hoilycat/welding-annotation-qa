@@ -80,6 +80,8 @@ Perceptual hash는 검토 후보를 좁히는 도구입니다. 촬영 조건이 
 
 `review`는 자동 삭제나 실패를 의미하지 않습니다. `failed` 상태에서는 데이터 릴리스 전에 오류를 먼저 해결해야 합니다.
 
+대시보드의 **왜 이 상태로 판정됐나요?** 영역에는 최종 상태를 만든 검사 항목과 개수가 표시됩니다. 각 유사 이미지 비교 카드에는 현재 Hash 거리와 밝기 차이가 어떤 임계값을 만족해서 후보가 됐는지도 함께 설명합니다.
+
 ## 임계값 조정
 
 ```bash
@@ -89,12 +91,14 @@ python -m welding_qa.release_report \
   --output-dir reports/release-strict \
   --overlap-threshold 0.05 \
   --duplicate-annotation-iou 0.85 \
-  --perceptual-distance 6
+  --perceptual-distance 6 \
+  --brightness-tolerance 18
 ```
 
 - `--overlap-threshold`: 작은 값일수록 더 작은 겹침도 표시
 - `--duplicate-annotation-iou`: 같은 라벨을 중복 후보로 보는 IoU 기준
 - `--perceptual-distance`: 큰 값일수록 더 넓은 범위의 유사 이미지를 표시
+- `--brightness-tolerance`: 큰 값일수록 평균 밝기가 더 다른 이미지까지 후보로 허용
 
 ## 대시보드 디자인
 
