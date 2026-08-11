@@ -19,6 +19,12 @@ CVAT 기반 용접 어노테이션 데이터셋의 품질 검증, 표준 Taxonom
 - [x] Task 자동 등록 및 어노테이션 동기화 파이프라인
 - [x] Raw JSON ↔ CVAT Polygon 2-way 변환 서브시스템
 
+### Phase 2.5: Dataset QA & Export (Complete)
+- [x] 디렉터리 단위 QA JSON 리포트
+- [x] COCO instance segmentation 내보내기
+- [x] YOLO segmentation 데이터셋 내보내기
+- [x] Windows·macOS 로컬 CVAT 실행 및 smoke test 스크립트
+
 ### Phase 3: Automated QA & Validation Dashboard (Upcoming)
 - [ ] Annotation 간 레이블 충돌 및 중첩 자동 검수기
 - [ ] Duplicate Image Detection (Perceptual Hashing)
