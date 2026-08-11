@@ -1,484 +1,132 @@
 <div align="center">
 
-# 🔥 welding-annotation-qa
+# Welding Annotation QA
 
-### 용접 결함 라벨을 가지런히 정리하는 데이터 QA 도구
+**용접 결함 어노테이션을 검사하고 CVAT·COCO·YOLO 작업으로 연결하는 도구**
 
-![version](https://img.shields.io/badge/version-0.3-E76F51?style=flat-square)
-![status](https://img.shields.io/badge/status-foundation-F4A261?style=flat-square)
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![Pytest](https://img.shields.io/badge/tests-pytest-2A9D8F?style=flat-square&logo=pytest&logoColor=white)
-
-> **“모델이 배우기 전에, 라벨부터 가지런히.”**<br>
-> 제각각인 용접 결함 Polygon JSON을 검사하고 하나의 표준 이름으로 정리합니다.
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-155%20passed-brightgreen)
+![Version](https://img.shields.io/badge/version-v0.3-blue)
 
 </div>
 
----
+## 프로젝트 소개
 
-## 🧹 어떤 프로젝트인가요?
-
-같은 용접 결함인데도 데이터마다 이름이 다를 수 있습니다.
+RIAWELC 형식의 용접 결함 어노테이션을 읽고, 서로 다르게 적힌 라벨을 하나의 표준 라벨로 정규화합니다.
 
 ```text
-기공 · POROSITY · gas_pore · blowhole
-                    ↓
-               ✨ porosity ✨
+slag / Slag / 슬래그 → slag_inclusion
+기공 / blowhole     → porosity
 ```
 
-`welding-annotation-qa`는 이렇게 제각각인 라벨을 하나의 **canonical taxonomy**로 통일하고, Polygon 좌표와 JSON 구조에 문제가 없는지 모델 학습 전에 확인합니다.
+검증을 통과한 데이터는 CVAT 업로드, QA 리포트, COCO JSON, YOLO Segmentation 데이터셋으로 변환할 수 있습니다.
 
-쉽게 말하면, **용접 데이터가 모델에게 들어가기 전에 한 번 정리해 주는 라벨 정리반**입니다. 🧤
+## 주요 기능
 
-> 📍 현재 버전은 **v0.3**입니다.<br>
-> JSON 검증, 라벨 정규화, CVAT Project/Task 생성과 annotation 동기화를 지원합니다.<br>
-> Canonical polygon export와 dataset QA 리포트를 제공하며 YOLO/COCO export는 다음 단계입니다.
-
-현재 테스트 스위트는 **137개**이며, 로컬 CVAT에서 이미지 업로드 → annotation 동기화 →
-canonical JSON export 전체 smoke test도 통과했습니다.
-
----
-
-## ✨ v0.3에서 할 수 있는 일
-
-| 기능 | 하는 일 |
+| 기능 | 설명 |
 |---|---|
-| 🏷️ 라벨 정규화 | `기공`, `POROSITY`, `gas_pore`를 `porosity`로 통일 |
-| 📐 Polygon 검사 | 좌표 구조, 면적, 자기교차, 중복점과 이미지 경계 확인 |
-| 🚨 오류 감지 | 올바르지 않은 annotation 항목을 즉시 알림 |
-| 🩻 검사 방식 확인 | 결함별 RT/VT modality 허용 여부 검증 |
-| 🖼️ 메타데이터 보존 | `image_id`, `filename`, `width`, `height` 유지 |
-| 🌱 정상 이미지 허용 | 결함이 없는 `annotations: []`도 정상 처리 |
-| 📤 CVAT 등록 | taxonomy Project와 이미지 Task를 생성하거나 안전하게 재사용 |
+| 라벨 정규화 | 영문·한글·별칭을 6개 결함 canonical label로 통합 |
+| 데이터 검증 | 필수 필드, 좌표 범위, polygon 구조, 정상 이미지 규칙 검사 |
+| CVAT 연동 | Project/Task 생성·재사용, 이미지 업로드, 어노테이션 동기화·내보내기 |
+| QA 리포트 | 오류 위치와 원인을 JSON 리포트로 저장 |
+| COCO 내보내기 | polygon, bbox, area를 포함한 COCO JSON 생성 |
+| YOLO 내보내기 | 정규화된 polygon 좌표와 클래스 파일 생성 |
 
-입력은 다음 세 가지 형태를 지원합니다.
+## 표준 라벨
 
-- JSON 파일 경로
-- JSON 문자열
-- Python dictionary
+표준 정의는 [`configs/taxonomy.yaml`](configs/taxonomy.yaml)에 있습니다.
 
-JSON의 annotation 목록 이름은 `annotations`, `shapes`, `objects` 중 하나를 사용할 수 있습니다.
-`width`와 `height`가 있으면 Polygon 좌표는 `0 ≤ x ≤ width`,
-`0 ≤ y ≤ height` 범위여야 하며 연속점과 닫힘점은 중복될 수 없습니다.
+| ID | Canonical label | 의미 |
+|---:|---|---|
+| 0 | `porosity` | 기공 |
+| 1 | `slag_inclusion` | 슬래그 혼입 |
+| 2 | `crack` | 균열 |
+| 3 | `lack_of_fusion` | 융합 불량 |
+| 4 | `incomplete_penetration` | 용입 불량 |
+| 5 | `undercut` | 언더컷 |
 
----
+> 정상 이미지는 별도 결함 클래스가 아니라 빈 `annotations` 목록으로 표현합니다.
 
-## 🏷️ Canonical Defect Friends
-
-현재 함께 정리하는 용접 결함 친구들은 총 6종입니다.
-
-| 아이콘 | Canonical label | 한글 이름 |
-|:---:|---|---|
-| 🫧 | `porosity` | 기공 |
-| 🪨 | `slag_inclusion` | 슬래그 혼입 |
-| ⚡ | `crack` | 균열 |
-| 🧩 | `lack_of_fusion` | 융합 불량 |
-| 🕳️ | `incomplete_penetration` | 용입 부족 |
-| 🌙 | `undercut` | 언더컷 |
-
-라벨과 alias 설정은 [`configs/taxonomy.yaml`](configs/taxonomy.yaml)에서 관리합니다.
-
----
-
-## 🚀 빠르게 시작하기
-
-Python 3.10 이상이 필요합니다.
+## 빠른 시작
 
 ```bash
-pip install -e ".[dev]"
-pytest
+python -m venv .venv
 ```
 
-macOS에서는 시스템 `python`이 없을 수 있으므로 `python3`로 가상환경을 만든 뒤
-설치하는 방식을 권장합니다.
+가상환경을 활성화합니다.
 
 ```bash
-python3 -m venv .venv
+# macOS / Linux
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev,cvat]"
-pytest
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
 ```
 
-Python 코드에서는 이렇게 사용할 수 있습니다.
+의존성을 설치하고 테스트합니다.
+
+```bash
+python -m pip install -e ".[dev,cvat]"
+python -m pytest -q
+```
+
+기본 사용 예시:
 
 ```python
+from pathlib import Path
+
 from welding_qa import TaxonomyConfig, parse_riawelc_json
 
-taxonomy = TaxonomyConfig.load_from_yaml("configs/taxonomy.yaml")
-annotations = parse_riawelc_json(
-    "tests/fixtures/sample_annotation.json",
-    taxonomy,
-)
+taxonomy = TaxonomyConfig.load_from_yaml(Path("configs/taxonomy.yaml"))
+annotations = parse_riawelc_json(Path("annotation.json"), taxonomy)
 
-print(annotations[0].label_original)   # 기공
-print(annotations[0].label_canonical)  # porosity
+for annotation in annotations:
+    print(annotation.label_canonical)
 ```
 
-결함이 없는 깨끗한 이미지라면 아래처럼 작성할 수 있습니다.
-
-```json
-{
-  "modality": "RT",
-  "annotations": []
-}
-```
-
-이 경우 오류가 아니라 빈 annotation 목록을 반환합니다. 🌿
-
-### CVAT Polygon payload 만들기
-
-CVAT 프로젝트에서 조회한 label ID를 canonical label에 연결하면 검증된
-annotation을 `LabeledShapeRequest` 형태로 변환할 수 있습니다.
-
-```python
-from welding_qa import annotations_to_cvat_shapes
-
-label_ids = {"porosity": 7}  # CVAT 프로젝트의 실제 label ID
-shapes = annotations_to_cvat_shapes(
-    annotations,
-    label_ids,
-    frame=0,
-)
-
-cvat_payload = {
-    "version": 0,
-    "tags": [],
-    "shapes": shapes,
-    "tracks": [],
-    "intervals": [],
-}
-```
-
-각 Polygon 좌표는 CVAT 형식인 `[x1, y1, x2, y2, ...]`로 변환됩니다.
-`cvat_shapes_to_annotations`를 사용하면 CVAT shape를 다시
-`DefectAnnotation`으로 가져올 수 있습니다.
-
-### 로컬 CVAT 환경 실행하기
-
-Docker Desktop을 실행한 뒤 프로젝트에 고정된 CVAT 버전을 준비하고 시작할 수 있습니다.
-
-macOS/Linux:
+## 자주 쓰는 명령
 
 ```bash
-cp .env.cvat.example .env.cvat
-./scripts/cvat-local.sh bootstrap
-./scripts/cvat-local.sh up
+# 전체 데이터 QA 리포트
+python -m welding_qa.qa_report --annotations data/annotations --output reports/qa-report.json
+
+# COCO JSON 생성
+python -m welding_qa.coco_export --images data/images --annotations data/annotations --output exports/coco/annotations.json
+
+# YOLO Segmentation 데이터셋 생성
+python -m welding_qa.yolo_export --images data/images --annotations data/annotations --output-dir exports/yolo
 ```
 
-macOS에서는 Docker Desktop과 Git이 먼저 준비되어 있어야 합니다. CVAT 화면은
-Safari 대신 Chrome 또는 Edge에서 여는 것을 권장합니다. smoke 스크립트는
-`PYTHON`을 지정하지 않으면 `.venv/bin/python`, `python3`, `python` 순서로 실행기를
-찾습니다.
+CVAT 서버 설치와 업로드·동기화 명령은 아래 문서에서 확인할 수 있습니다.
 
-Windows PowerShell:
+## 문서
 
-```powershell
-Copy-Item .env.cvat.example .env.cvat
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 bootstrap
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 up
-```
-
-CVAT는 기본적으로 <http://localhost:8080>에서 열립니다. 최초 관리자 계정은
-서버가 준비된 다음 대화형 명령으로 생성합니다.
-
-```bash
-./scripts/cvat-local.sh health
-./scripts/cvat-local.sh superuser
-```
-
-`health`는 Docker 내부 명령보다 먼저 CVAT API(`/api/server/about`)를 확인하므로,
-Docker socket 권한이 제한된 환경에서도 실제 서비스가 응답하는지 판별할 수 있습니다.
-
-이미지 업로드부터 annotation 동기화와 canonical export까지 한 번에 확인하려면
-smoke test 스크립트를 사용할 수 있습니다. `--replace`는 기존 Task의 annotation을
-명시적으로 교체하므로 테스트 전용 Task에서만 사용합니다. annotation 폴더를 전달하면
-CVAT 자원을 만들기 전에 입력 전체를 검증하고, export 후 canonical 라벨과 모든 Polygon
-좌표가 입력과 정확히 일치하는지 확인합니다.
-
-```bash
-PYTHON=.venv/bin/python ./scripts/cvat-smoke.sh \
-  --images data/cvat-smoke-20260807 \
-  --annotations data/rt-annotations \
-  --export-dir reports/cvat-smoke \
-  --replace
-```
-
-Windows PowerShell에서는 같은 검사를 다음처럼 실행합니다.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-smoke.ps1 `
-  -Images data\cvat-smoke-20260807 `
-  -Annotations data\rt-annotations `
-  -ExportDir reports\cvat-smoke `
-  -Replace
-```
-
-JSON 폴더만 검사하는 dataset QA 리포트는 다음처럼 생성합니다.
-
-```bash
-python -m welding_qa.qa_report \
-  --annotations data/rt-annotations \
-  --modality RT \
-  --output reports/rt-qa.json
-```
-
-리포트 파일은 잘못된 JSON의 상세 오류도 저장합니다. 유효하지 않은 파일이 하나라도 있으면
-CLI는 자동화에서 실패를 감지할 수 있도록 종료 코드 `1`을 반환합니다.
-
-### COCO instance segmentation으로 내보내기
-
-검증된 이미지와 RIAWELC JSON을 학습용 COCO Polygon JSON으로 변환할 수 있습니다.
-실제 이미지 크기와 파일 무결성도 함께 확인하며, JSON의 파일명·크기·Polygon 경계가
-이미지와 다르면 출력 파일을 만들지 않고 실패합니다.
-
-```bash
-python -m welding_qa.coco_export \
-  --images data/rt-images \
-  --annotations data/rt-annotations \
-  --modality RT \
-  --output exports/rt-coco.json
-```
-
-결함이 없는 정상 이미지도 COCO `images` 목록에는 유지되며 `annotations`만 비어 있습니다.
-JSON이 없는 이미지를 의도적으로 정상으로 취급하려면 `--allow-missing-annotations`를
-명시합니다. 기본값은 누락 JSON을 오류로 처리하므로, 깨끗한 이미지에는 가능한 한
-`annotations: []`가 있는 JSON을 준비하는 것이 안전합니다.
-
-category ID는 `configs/taxonomy.yaml`의 canonical class 순서로 1부터 결정됩니다.
-각 annotation에는 COCO Polygon `segmentation`, shoelace 면적, bounding box와
-`iscrowd: 0`이 기록됩니다.
-
-### YOLO segmentation dataset으로 내보내기
-
-같은 검증 경계를 사용해 이미지와 정규화 Polygon label을 휴대 가능한 YOLO 폴더로
-내보낼 수 있습니다. class ID는 taxonomy 순서의 0부터 시작하고, 각 꼭짓점은 실제
-이미지 width/height로 나눠 0~1 범위로 기록됩니다.
-
-```bash
-python -m welding_qa.yolo_export \
-  --images data/rt-images \
-  --annotations data/rt-annotations \
-  --modality RT \
-  --output-dir exports/rt-yolo
-```
-
-출력 구조는 다음과 같습니다.
-
-```text
-rt-yolo/
-├── images/          # 검증을 통과한 원본 이미지 사본과 상대 폴더 구조
-├── labels/          # 이미지마다 대응하는 YOLO segmentation .txt
-├── classes.yaml     # 0-based class ID와 canonical slug 매핑
-└── manifest.json    # 이미지·label 경로, 크기, annotation 수
-```
-
-정상 이미지에도 같은 stem의 빈 `.txt`를 만들어 “누락 label”과 “결함 없음”을 구분합니다.
-안전한 재실행을 위해 `--output-dir`이 이미 있으면 덮어쓰지 않고 실패하며, 모든 파일을
-임시 폴더에 완성한 뒤에만 최종 폴더로 이동합니다. train/validation 분리는 데이터 정책과
-평가 결과에 영향을 주므로 exporter가 임의로 만들지 않습니다. 분리 후 `classes.yaml`의
-`names`를 Ultralytics `data.yaml`에 사용합니다.
-
-COCO category ID는 1-based이고 YOLO class ID는 0-based이지만 두 exporter 모두 같은
-taxonomy 순서를 사용합니다. 따라서 같은 결함은 두 형식에서 ID가 정확히 1만큼 차이 납니다.
-
-Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 health
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 superuser
-```
-
-Python SDK가 필요한 개발 환경은 서버와 같은 2.71 버전으로 설치됩니다.
-
-```bash
-pip install -e ".[dev,cvat]"
-```
-
-상태 확인과 종료에는 다음 명령을 사용합니다. `down`은 Docker 데이터 볼륨을
-삭제하지 않으므로 생성한 사용자와 annotation이 유지됩니다.
-
-```bash
-./scripts/cvat-local.sh status
-./scripts/cvat-local.sh down
-```
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 status
-powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 down
-```
-
-### CVAT Project와 Task 관리
-
-`.env.cvat`에 관리자 계정 또는 Personal Access Token을 설정하면 canonical taxonomy로
-RT/VT Polygon Project를 생성할 수 있습니다. 같은 이름과 label 구성을 가진
-Project가 이미 있으면 새로 만들지 않고 재사용합니다.
-
-```bash
-set -a
-source .env.cvat
-set +a
-
-python -m welding_qa.cvat_project --modality RT
-python -m welding_qa.cvat_project --modality VT
-```
-
-이미지 폴더를 Project 아래 Task로 업로드할 때는 다음 명령을 사용합니다. 같은 이름의
-Task가 있고 frame 파일명도 모두 같으면 기존 Task를 재사용합니다.
-
-```bash
-python -m welding_qa.cvat_task --modality RT --images data/rt-images
-python -m welding_qa.cvat_task --modality VT --images data/vt-images
-```
-
-이미지와 같은 stem의 RIAWELC JSON을 함께 등록하거나 CVAT의 현재 polygon을 JSON으로
-내보낼 수 있습니다. 예를 들어 `001.png`는 `001.json`과 매칭됩니다. 이미지 또는 JSON의
-stem이 중복되거나, 이미지와 JSON이 서로 대응하지 않거나, JSON의 modality가 Task와
-다르면 잘못된 매칭을 막기 위해 명령이 실패합니다. 결함이 없는 이미지도
-`annotations: []`를 가진 JSON을 명시적으로 준비합니다.
-
-```bash
-python -m welding_qa.cvat_task --modality RT --images data/rt-images \
-  --annotations data/rt-annotations
-
-python -m welding_qa.cvat_task --modality RT --images data/rt-images \
-  --export-annotations exports/rt-annotations
-```
-
-부분 annotation 세트를 의도적으로 올리는 경우에만 JSON이 없는 이미지를 빈 annotation으로
-처리하는 옵션을 사용합니다. 이미지와 매칭되지 않는 JSON은 이 옵션으로도 허용하지 않습니다.
-
-```bash
-python -m welding_qa.cvat_task --modality RT --images data/rt-images \
-  --annotations data/rt-annotations --allow-missing-annotations
-```
-
-기존 Task에 어노테이션이 있으면 작업자의 수정 내용을 보호하기 위해 업로드를 거부합니다.
-`--export-annotations`는 모델 학습용 canonical polygon 내보내기이며 CVAT 전체 백업이
-아닙니다. tracks, tags, attributes까지 보존하려면 CVAT의 native dataset export로 먼저
-백업한 다음 명시적으로 교체 옵션을 사용합니다. tracks나 tags가 있는 Task의 canonical
-export는 데이터 누락을 막기 위해 실패합니다.
-
-```bash
-python -m welding_qa.cvat_task --modality RT --images data/rt-images \
-  --annotations data/rt-annotations --replace-annotations
-```
-
-Windows PowerShell에서는 `.env.cvat`을 현재 세션에 불러온 뒤 실행합니다.
-
-```powershell
-Get-Content .env.cvat | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' } | ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    Set-Item -Path "Env:$name" -Value $value
-}
-
-python -m welding_qa.cvat_project --modality RT
-python -m welding_qa.cvat_project --modality VT
-python -m welding_qa.cvat_task --modality RT --images data/rt-images
-python -m welding_qa.cvat_task --modality VT --images data/vt-images
-```
-
----
-
-## 🔄 데이터는 이렇게 흘러가요
-
-```text
-📁 원본 이미지 + 제각각인 Polygon JSON
-                    ↓
-          🧹 welding-annotation-qa
-          ├─ JSON 구조 확인
-          ├─ Polygon 기본 검사
-          ├─ 라벨 이름 통일
-          └─ RT/VT modality 확인
-                    ↓
-       ✨ 검증된 DefectAnnotation 목록
-                    ↓
-       🧩 CVAT Polygon shape 변환
-                    ↓
-          🔥 모델 학습과 결함 검출
-```
-
----
-
-## 🤝 WeldVision과는 어떤 사이인가요?
-
-두 저장소는 용접 결함 데이터를 사이에 둔 **정리 담당과 활용 담당**입니다.
-
-| 저장소 | 역할 |
+| 문서 | 내용 |
 |---|---|
-| 🧹 `welding-annotation-qa` | 학습 전에 데이터를 검사하고 라벨을 통일 |
-| 🔥 `WeldVision` | 정리된 데이터로 모델을 학습하고 결함을 검출·해석 |
+| [CVAT 로컬 서버 설정](docs/cvat-setup.md) | Docker 설치, 서버 시작·종료, 계정, 상태 확인, smoke test |
+| [어노테이션 작업 흐름](docs/annotation-workflow.md) | 입력 형식, QA, CVAT Project/Task, 동기화와 백업 |
+| [COCO·YOLO 내보내기](docs/export-formats.md) | 출력 형식, 클래스 ID, 안전 규칙과 사용 예시 |
+| [프로젝트 계획](docs/project-plan.md) | 단계별 목표와 향후 작업 |
 
-### 🔗 용접 결함 검출 프로젝트
-
-👉 **[WeldVision — welding-defect-detection](https://github.com/hoilycat/welding-defect-detection)**
-
----
-
-## 📂 프로젝트 구조
+## 데이터 흐름
 
 ```text
-welding-annotation-qa/
-├── configs/
-│   └── taxonomy.yaml          # 6개 결함 클래스와 alias
-├── src/welding_qa/
-│   ├── models.py              # Polygon과 annotation 모델
-│   ├── taxonomy.py            # 라벨 정규화
-│   ├── riawelc_reader.py      # JSON 파싱과 검증
-│   ├── cvat_converter.py      # CVAT Polygon 양방향 변환
-│   ├── cvat_project.py        # CVAT Project 생성·재사용
-│   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
-│   ├── dataset_export.py      # COCO/YOLO 공통 이미지·annotation 검증
-│   ├── qa_report.py           # annotation 폴더 QA 집계 리포트
-│   ├── coco_export.py         # COCO Polygon segmentation export
-│   ├── yolo_export.py         # YOLO Polygon segmentation dataset export
-│   ├── smoke_validation.py    # 플랫폼 공통 exact round-trip 검증
-│   └── resources/
-│       └── taxonomy.yaml      # wheel에 포함되는 기본 canonical taxonomy
-├── tests/
-│   ├── fixtures/              # 익명 샘플 JSON
-│   ├── test_cvat_converter.py
-│   ├── test_cvat_project.py
-│   ├── test_cvat_task.py
-│   ├── test_coco_export.py
-│   ├── test_yolo_export.py
-│   ├── test_qa_report.py
-│   ├── test_smoke_validation.py
-│   ├── test_taxonomy.py
-│   └── test_riawelc_reader.py
-├── scripts/
-│   ├── cvat-local.sh         # macOS/Linux CVAT 환경 관리
-│   ├── cvat-local.ps1        # Windows CVAT 환경 관리
-│   ├── cvat-smoke.sh         # macOS/Linux 업로드·동기화·export 통합 검사
-│   └── cvat-smoke.ps1        # Windows 업로드·동기화·export 통합 검사
-└── docs/
-    └── project-plan.md        # 다음 단계 로드맵
+RIAWELC JSON
+    ↓ 파싱·정규화·검증
+내부 Annotation 모델
+    ├─ CVAT Project / Task
+    ├─ QA report
+    ├─ COCO JSON
+    └─ YOLO Segmentation dataset
 ```
 
----
+## 관련 프로젝트
 
-## 🚧 다음 단계
+이 저장소는 데이터 준비와 품질 검사를 담당합니다. 모델 학습과 추론은 [WeldVision](https://github.com/hoilycat/WeldVision)에서 진행합니다.
 
-- [x] 6개 canonical 결함 taxonomy 정의
-- [x] RIAWELC JSON reader 구현
-- [x] Polygon 및 modality 기본 검증
-- [x] Polygon 면적 및 자기교차 검증
-- [x] 익명 fixture와 단위 테스트 구성
-- [x] CVAT REST API 연동
-- [x] CVAT Project 자동 생성
-- [x] CVAT Task 자동 생성과 이미지 업로드
-- [x] CVAT annotation 동기화 및 canonical polygon export
-- [x] COCO Polygon instance segmentation export
-- [x] YOLO segmentation export profile
-- [x] 기본 annotation QA 리포트
-- [ ] Validation dashboard와 Release Manifest
+## 현재 상태
 
-현재 구현하지 않은 상세 범위와 계획은 [`docs/project-plan.md`](docs/project-plan.md)에서 확인할 수 있습니다.
-
----
-
-<div align="center">
-
-**깨끗한 라벨이 좋은 모델을 만듭니다.** 🧹✨
-
-</div>
+- Python 3.10 이상과 Windows·macOS 스크립트 지원
+- 테스트 155개 통과
+- CVAT Project/Task 생성, 재사용, 동기화, 백업 지원
+- COCO 및 YOLO Segmentation 내보내기 지원
