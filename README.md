@@ -110,14 +110,20 @@ CVAT 서버 설치와 업로드·동기화 명령은 아래 문서에서 확인�
 
 ## 데이터 흐름
 
-```text
-RIAWELC JSON
-    ↓ 파싱·정규화·검증
-내부 Annotation 모델
-    ├─ CVAT Project / Task
-    ├─ QA report
-    ├─ COCO JSON
-    └─ YOLO Segmentation dataset
+```mermaid
+flowchart LR
+    A["원본 이미지<br/>RIAWELC JSON"] --> B["파싱·라벨 정규화"]
+    B --> C{"검증 통과?"}
+
+    C -- "아니요" --> D["QA 리포트<br/>오류 수정"]
+    D --> B
+
+    C -- "예" --> E["내부 Annotation 모델"]
+    E --> F["CVAT<br/>검토·수정"]
+    E --> G["COCO JSON"]
+    E --> H["YOLO Segmentation"]
+
+    F --> I["Canonical JSON 백업"]
 ```
 
 ## 관련 프로젝트
