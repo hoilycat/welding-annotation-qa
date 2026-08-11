@@ -1,12 +1,16 @@
 <div align="center">
 
-# Welding Annotation QA
+# 🔥 welding-annotation-qa
 
-**용접 결함 어노테이션을 검사하고 CVAT·COCO·YOLO 작업으로 연결하는 도구**
+### 용접 결함 라벨을 가지런히 정리하는 데이터 QA 도구
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-155%20passed-brightgreen)
-![Version](https://img.shields.io/badge/version-v0.3-blue)
+![version](https://img.shields.io/badge/version-0.3-E76F51?style=flat-square)
+![status](https://img.shields.io/badge/status-foundation-F4A261?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![Pytest](https://img.shields.io/badge/tests-155%20passed-2A9D8F?style=flat-square&logo=pytest&logoColor=white)
+
+> **“모델이 배우기 전에, 라벨부터 가지런히.”**<br>
+> 제각각인 용접 결함 Polygon JSON을 검사하고 하나의 표준 이름으로 정리합니다.
 
 </div>
 
@@ -32,18 +36,21 @@ slag / Slag / 슬래그 → slag_inclusion
 | COCO 내보내기 | polygon, bbox, area를 포함한 COCO JSON 생성 |
 | YOLO 내보내기 | 정규화된 polygon 좌표와 클래스 파일 생성 |
 
-## 표준 라벨
+## 🏷️ Canonical Defect Friends
 
-표준 정의는 [`configs/taxonomy.yaml`](configs/taxonomy.yaml)에 있습니다.
+현재 함께 정리하는 용접 결함 친구들은 총 6종입니다.
 
-| ID | Canonical label | 의미 |
+| ID | Canonical label | 한글 이름 |
 |---:|---|---|
-| 0 | `porosity` | 기공 |
-| 1 | `slag_inclusion` | 슬래그 혼입 |
-| 2 | `crack` | 균열 |
-| 3 | `lack_of_fusion` | 융합 불량 |
-| 4 | `incomplete_penetration` | 용입 불량 |
-| 5 | `undercut` | 언더컷 |
+| 0 | `porosity` | 🫧 기공 |
+| 1 | `slag_inclusion` | 🪨 슬래그 혼입 |
+| 2 | `crack` | ⚡ 균열 |
+| 3 | `lack_of_fusion` | 🧩 융합 불량 |
+| 4 | `incomplete_penetration` | 🕳️ 용입 부족 |
+| 5 | `undercut` | 🌙 언더컷 |
+
+라벨과 alias 설정은 [`configs/taxonomy.yaml`](configs/taxonomy.yaml)에서 관리합니다.
+이모지는 결함을 쉽게 구분하기 위한 설명용 표시이며 프로그램의 공식 아이콘은 아닙니다.
 
 > 정상 이미지는 별도 결함 클래스가 아니라 빈 `annotations` 목록으로 표현합니다.
 
@@ -136,3 +143,11 @@ flowchart LR
 - 테스트 155개 통과
 - CVAT Project/Task 생성, 재사용, 동기화, 백업 지원
 - COCO 및 YOLO Segmentation 내보내기 지원
+
+---
+
+<div align="center">
+
+**깨끗한 라벨이 좋은 모델을 만듭니다.** 🧹✨
+
+</div>
