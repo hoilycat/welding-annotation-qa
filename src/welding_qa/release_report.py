@@ -145,11 +145,15 @@ def build_release_manifest(
         for pair in duplicate_images["pairs"]
         for file_name in pair["files"]
     }
+    blocking_annotation_issues = [
+        issue for issue in annotation_issues if issue.get("severity") == "error"
+    ]
     review_items = len(annotation_issues) + len(duplicate_images["pairs"])
     blocking_errors = (
         qa["files_invalid"]
         + len(duplicate_images["errors"])
         + len(alignment_issues)
+        + len(blocking_annotation_issues)
     )
     status = "failed" if blocking_errors else "review" if review_items else "passed"
     annotation_issue_counts = summarize_issue_codes(annotation_issues)
@@ -178,12 +182,23 @@ def build_release_manifest(
                 "message": "읽거나 hash를 계산할 수 없는 이미지가 있습니다.",
             }
         )
-    if annotation_issues:
+    if blocking_annotation_issues:
+        status_reasons.append(
+            {
+                "code": "annotation_blocking_errors",
+                "count": len(blocking_annotation_issues),
+                "message": "서로 다른 canonical label이 겹치는 annotation 오류가 있습니다.",
+            }
+        )
+    review_annotation_issues = [
+        issue for issue in annotation_issues if issue.get("severity") != "error"
+    ]
+    if review_annotation_issues:
         status_reasons.append(
             {
                 "code": "annotation_review_candidates",
-                "count": len(annotation_issues),
-                "message": "IoU 기준을 넘은 라벨 충돌·중첩 후보가 있습니다.",
+                "count": len(review_annotation_issues),
+                "message": "IoU 기준을 넘은 annotation 중첩·중복 후보가 있습니다.",
             }
         )
     if duplicate_images["pairs"]:

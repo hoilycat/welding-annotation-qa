@@ -119,6 +119,33 @@ def test_build_release_manifest_marks_overlap_candidate_for_review(tmp_path: Pat
     }
 
 
+def test_build_release_manifest_marks_label_conflict_as_failed(tmp_path: Path):
+    image_root, annotation_root = _write_dataset(tmp_path)
+    annotation_path = annotation_root / "sample.json"
+    payload = json.loads(annotation_path.read_text(encoding="utf-8"))
+    payload["annotations"].append(
+        {
+            "label": "균열",
+            "polygon": {
+                "x": [24, 46, 46, 24],
+                "y": [20, 20, 42, 42],
+            },
+        }
+    )
+    annotation_path.write_text(
+        json.dumps(payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    taxonomy = TaxonomyConfig.load_from_yaml("configs/taxonomy.yaml")
+
+    manifest = build_release_manifest(image_root, annotation_root, taxonomy)
+
+    assert manifest["status"] == "failed"
+    assert manifest["summary"]["blocking_errors"] == 1
+    assert manifest["status_reasons"][0]["code"] == "annotation_blocking_errors"
+    assert manifest["checks"]["annotation_issue_counts"] == {"label_conflict": 1}
+
+
 def test_render_dashboard_uses_weldvision_theme_and_real_summary(tmp_path: Path):
     image_root, annotation_root = _write_dataset(tmp_path)
     taxonomy = TaxonomyConfig.load_from_yaml("configs/taxonomy.yaml")

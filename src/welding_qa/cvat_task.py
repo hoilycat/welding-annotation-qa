@@ -281,7 +281,7 @@ def export_task_annotations(
     shapes = annotation_payload["shapes"]
 
     shapes_by_frame: dict[int, list[dict[str, Any]]] = {}
-    for shape in shapes:
+    for shape_index, shape in enumerate(shapes):
         shape_dict = shape if isinstance(shape, dict) else {
             "type": getattr(_field(shape, "type"), "value", _field(shape, "type")),
             "frame": _field(shape, "frame"),
@@ -291,6 +291,15 @@ def export_task_annotations(
             "source": _field(shape, "source") or "manual",
         }
         frame_idx = shape_dict.get("frame", 0)
+        if (
+            isinstance(frame_idx, bool)
+            or not isinstance(frame_idx, int)
+            or not 0 <= frame_idx < len(frames_info)
+        ):
+            raise ParsingError(
+                f"CVAT shape at index {shape_index} references invalid frame "
+                f"'{frame_idx}' for a task with {len(frames_info)} frames."
+            )
         shapes_by_frame.setdefault(frame_idx, []).append(shape_dict)
 
     frame_names = [Path(str(_field(frame, "name"))).name for frame in frames_info]

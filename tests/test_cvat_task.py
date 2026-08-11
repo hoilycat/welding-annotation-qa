@@ -407,6 +407,28 @@ def test_export_rejects_frame_stem_collision():
         export_task_annotations(task, project, taxonomy)
 
 
+@pytest.mark.parametrize("frame", [-1, 1, None, False, "0"])
+def test_export_rejects_shape_outside_task_frames(frame: object):
+    from welding_qa.cvat_task import export_task_annotations
+    from welding_qa.taxonomy import TaxonomyConfig
+
+    task = FakeTask(1, "RT batch", ["001.png"])
+    task.annotations["shapes"] = [
+        {
+            "type": "polygon",
+            "frame": frame,
+            "label_id": 1,
+            "points": [0, 0, 2, 0, 0, 2],
+        }
+    ]
+    project = FakeProject()
+    project.labels = [{"id": 1, "name": "porosity"}]
+    taxonomy = TaxonomyConfig.load_from_yaml("configs/taxonomy.yaml")
+
+    with pytest.raises(ParsingError, match="references invalid frame"):
+        export_task_annotations(task, project, taxonomy)
+
+
 @pytest.mark.parametrize("field", ["tracks", "tags"])
 def test_export_rejects_unsupported_annotation_types(field: str):
     from welding_qa.cvat_task import export_task_annotations
