@@ -249,6 +249,39 @@ category ID는 `configs/taxonomy.yaml`의 canonical class 순서로 1부터 결�
 각 annotation에는 COCO Polygon `segmentation`, shoelace 면적, bounding box와
 `iscrowd: 0`이 기록됩니다.
 
+### YOLO segmentation dataset으로 내보내기
+
+같은 검증 경계를 사용해 이미지와 정규화 Polygon label을 휴대 가능한 YOLO 폴더로
+내보낼 수 있습니다. class ID는 taxonomy 순서의 0부터 시작하고, 각 꼭짓점은 실제
+이미지 width/height로 나눠 0~1 범위로 기록됩니다.
+
+```bash
+python -m welding_qa.yolo_export \
+  --images data/rt-images \
+  --annotations data/rt-annotations \
+  --modality RT \
+  --output-dir exports/rt-yolo
+```
+
+출력 구조는 다음과 같습니다.
+
+```text
+rt-yolo/
+├── images/          # 검증을 통과한 원본 이미지 사본과 상대 폴더 구조
+├── labels/          # 이미지마다 대응하는 YOLO segmentation .txt
+├── classes.yaml     # 0-based class ID와 canonical slug 매핑
+└── manifest.json    # 이미지·label 경로, 크기, annotation 수
+```
+
+정상 이미지에도 같은 stem의 빈 `.txt`를 만들어 “누락 label”과 “결함 없음”을 구분합니다.
+안전한 재실행을 위해 `--output-dir`이 이미 있으면 덮어쓰지 않고 실패하며, 모든 파일을
+임시 폴더에 완성한 뒤에만 최종 폴더로 이동합니다. train/validation 분리는 데이터 정책과
+평가 결과에 영향을 주므로 exporter가 임의로 만들지 않습니다. 분리 후 `classes.yaml`의
+`names`를 Ultralytics `data.yaml`에 사용합니다.
+
+COCO category ID는 1-based이고 YOLO class ID는 0-based이지만 두 exporter 모두 같은
+taxonomy 순서를 사용합니다. 따라서 같은 결함은 두 형식에서 ID가 정확히 1만큼 차이 납니다.
+
 Windows에서는 같은 명령을 PowerShell 스크립트로 실행합니다.
 
 ```powershell
@@ -275,15 +308,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 status
 powershell -ExecutionPolicy Bypass -File .\scripts\cvat-local.ps1 down
 ```
 
-### 학교와 집에서 작업 이어가기
-
-이미지 원본과 `.env.cvat`는 Git에 넣지 않고 별도로 보관합니다. 다른 컴퓨터에서 작업할 때는
-같은 상대 경로로 이미지·RIAWELC JSON 폴더를 복원한 뒤 `.env.cvat`를 다시 설정합니다.
-
-- CVAT annotation을 계속 편집하려면 CVAT의 **native dataset export**로 전체 백업합니다.
-- 학습용 canonical polygon만 옮길 때는 `--export-annotations` 결과를 사용합니다.
-- canonical export는 tracks, tags, attributes와 같은 CVAT 전체 메타데이터 백업을 대신하지 않습니다.
-- `.env.cvat`에는 인증정보가 들어갈 수 있으므로 저장소에 커밋하지 않습니다.
+### CVAT Project와 Task 관리
 
 `.env.cvat`에 관리자 계정 또는 Personal Access Token을 설정하면 canonical taxonomy로
 RT/VT Polygon Project를 생성할 수 있습니다. 같은 이름과 label 구성을 가진
@@ -403,8 +428,10 @@ welding-annotation-qa/
 │   ├── cvat_converter.py      # CVAT Polygon 양방향 변환
 │   ├── cvat_project.py        # CVAT Project 생성·재사용
 │   ├── cvat_task.py           # CVAT Task 생성·이미지 업로드
+│   ├── dataset_export.py      # COCO/YOLO 공통 이미지·annotation 검증
 │   ├── qa_report.py           # annotation 폴더 QA 집계 리포트
 │   ├── coco_export.py         # COCO Polygon segmentation export
+│   ├── yolo_export.py         # YOLO Polygon segmentation dataset export
 │   ├── smoke_validation.py    # 플랫폼 공통 exact round-trip 검증
 │   └── resources/
 │       └── taxonomy.yaml      # wheel에 포함되는 기본 canonical taxonomy
@@ -414,6 +441,7 @@ welding-annotation-qa/
 │   ├── test_cvat_project.py
 │   ├── test_cvat_task.py
 │   ├── test_coco_export.py
+│   ├── test_yolo_export.py
 │   ├── test_qa_report.py
 │   ├── test_smoke_validation.py
 │   ├── test_taxonomy.py
@@ -441,7 +469,7 @@ welding-annotation-qa/
 - [x] CVAT Task 자동 생성과 이미지 업로드
 - [x] CVAT annotation 동기화 및 canonical polygon export
 - [x] COCO Polygon instance segmentation export
-- [ ] YOLO segmentation export profile
+- [x] YOLO segmentation export profile
 - [x] 기본 annotation QA 리포트
 - [ ] Validation dashboard와 Release Manifest
 
