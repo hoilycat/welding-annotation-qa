@@ -25,6 +25,12 @@ slag / Slag / 슬래그 → slag_inclusion
 
 검증을 통과한 데이터는 CVAT 업로드, QA 리포트, COCO JSON, YOLO Segmentation 데이터셋으로 변환할 수 있습니다.
 
+## 실행 화면
+
+![Welding QA 대시보드 — 데이터셋 검사 결과와 Release Manifest](docs/media/qa-dashboard.jpg)
+
+QA 대시보드에서 유효 JSON, 결함 분포, 충돌·중첩, 유사 이미지, 파싱 오류와 Release Manifest를 한눈에 확인할 수 있습니다.
+
 ## 주요 기능
 
 | 기능 | 설명 |
@@ -143,7 +149,7 @@ flowchart LR
 
 ## 관련 프로젝트
 
-이 저장소는 데이터 준비와 품질 검사를 담당합니다. 모델 학습과 추론은 [WeldVision](https://github.com/hoilycat/WeldVision)에서 진행합니다.
+이 저장소는 데이터 준비와 품질 검사를 담당합니다. 모델 학습과 추론은 [WeldVision](https://github.com/hoilycat/welding-defect-detection)에서 진행합니다.
 
 ## 현재 상태
 
